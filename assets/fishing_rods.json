@@ -1,0 +1,938 @@
+[
+    {
+        "id": "rod_001",
+        "name": "독야1",
+        "brandId": "brand_001",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_002",
+        "name": "독야2",
+        "brandId": "brand_001",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_003",
+        "name": "독야 마스터",
+        "brandId": "brand_001",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_004",
+        "name": "독야 레전드",
+        "brandId": "brand_001",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_005",
+        "name": "초야비상 (OEM)",
+        "brandId": "brand_001",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_006",
+        "name": "체어맨 블루",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_007",
+        "name": "체어맨 블루2",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_008",
+        "name": "체어맨 블루3",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_009",
+        "name": "체어맨 무전무패 대물",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_010",
+        "name": "체어맨 무전무패 골드",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_011",
+        "name": "체어맨 야경",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_012",
+        "name": "체어맨 야경 대물",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_013",
+        "name": "체어맨 H 대물",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_014",
+        "name": "체어맨 흑몽",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_015",
+        "name": "체어맨 흑몽 플러스",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_016",
+        "name": "체어맨 야전 대물",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_017",
+        "name": "체어맨 야수",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_018",
+        "name": "체어맨 휘",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_019",
+        "name": "체어맨 HC 골드",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_020",
+        "name": "체어맨 후(WHO)",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_021",
+        "name": "체어맨 흑경골드",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_022",
+        "name": "체어맨 레드",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_023",
+        "name": "갤럭시 휘",
+        "brandId": "brand_002",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_024",
+        "name": "백작 리미티드 S",
+        "brandId": "brand_003",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_025",
+        "name": "백작 리미티드",
+        "brandId": "brand_003",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_026",
+        "name": "맹호",
+        "brandId": "brand_004",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_027",
+        "name": "설화수 프리미엄",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_028",
+        "name": "설화수 골드",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_029",
+        "name": "설화수 트렌드",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_030",
+        "name": "설화수 리미트",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_031",
+        "name": "설화수 스페셜3",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_032",
+        "name": "강포 골드",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_033",
+        "name": "운명",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_034",
+        "name": "학자수",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_035",
+        "name": "천년학 리미트",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_036",
+        "name": "천향",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_037",
+        "name": "천년혼",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_038",
+        "name": "천년혼 골드",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_039",
+        "name": "허송세월",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_040",
+        "name": "한반도 케브라",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_041",
+        "name": "한반도 하이카본",
+        "brandId": "brand_005",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_042",
+        "name": "자수정 큐",
+        "brandId": "brand_006",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_043",
+        "name": "자수정 드림",
+        "brandId": "brand_006",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_044",
+        "name": "자수정 드림 골드",
+        "brandId": "brand_006",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_045",
+        "name": "자수정 드림 스페셜",
+        "brandId": "brand_006",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_046",
+        "name": "도비",
+        "brandId": "brand_006",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_047",
+        "name": "록시 레드 (일반)",
+        "brandId": "brand_006",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_048",
+        "name": "록시 골드",
+        "brandId": "brand_006",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_049",
+        "name": "클라우드 운",
+        "brandId": "brand_006",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_050",
+        "name": "클라우드 프리미엄",
+        "brandId": "brand_006",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_051",
+        "name": "월드플렉스 백작",
+        "brandId": "brand_006",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_052",
+        "name": "대자연",
+        "brandId": "brand_006",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_053",
+        "name": "향어2",
+        "brandId": "brand_006",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_054",
+        "name": "아이테르 리멤버",
+        "brandId": "brand_007",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_055",
+        "name": "수파 난",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_056",
+        "name": "DHC 명파S",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_057",
+        "name": "DHC 명파플렉스",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_058",
+        "name": "D-WIND 수파",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_059",
+        "name": "수파 골드 @",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_060",
+        "name": "다이아플렉스 명파",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_061",
+        "name": "다이아플렉스 그랜드수향",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_062",
+        "name": "다이아플렉스 NT수향",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_063",
+        "name": "다이아플렉스 NT수향2",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_064",
+        "name": "수향 해마1",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_065",
+        "name": "다이아플렉스 신수향",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_066",
+        "name": "다이아플렉스 신수향2",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_067",
+        "name": "수향플렉스",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_068",
+        "name": "플렉스 신수정",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_069",
+        "name": "GT흑파",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_070",
+        "name": "NT대물",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_071",
+        "name": "GT대물조선",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_072",
+        "name": "다이아플렉스 향어",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_073",
+        "name": "파워와인드 향어",
+        "brandId": "brand_008",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_074",
+        "name": "청명 MX",
+        "brandId": "brand_009",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_075",
+        "name": "청명 MX2",
+        "brandId": "brand_009",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_076",
+        "name": "청명 X",
+        "brandId": "brand_009",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_077",
+        "name": "청명 골드",
+        "brandId": "brand_009",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_078",
+        "name": "청명 골드 경조",
+        "brandId": "brand_009",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_079",
+        "name": "청명 마스터",
+        "brandId": "brand_009",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_080",
+        "name": "청명 프리미엄",
+        "brandId": "brand_009",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_081",
+        "name": "청명 레이카",
+        "brandId": "brand_009",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_082",
+        "name": "천명극 프리미엄 블랙",
+        "brandId": "brand_010",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_083",
+        "name": "천년지기 골드",
+        "brandId": "brand_011",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_084",
+        "name": "멤피스 리미티드",
+        "brandId": "brand_011",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_085",
+        "name": "천지연",
+        "brandId": "brand_012",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_086",
+        "name": "소양강",
+        "brandId": "brand_012",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_087",
+        "name": "수월천 골드",
+        "brandId": "brand_012",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_088",
+        "name": "케브라 포인트",
+        "brandId": "brand_012",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_089",
+        "name": "슈퍼 포인트",
+        "brandId": "brand_012",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_090",
+        "name": "비원",
+        "brandId": "brand_012",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_091",
+        "name": "토네이도 블루",
+        "brandId": "brand_013",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_092",
+        "name": "프라이드 서목",
+        "brandId": "brand_014",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_093",
+        "name": "수보",
+        "brandId": "brand_015",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_094",
+        "name": "무한",
+        "brandId": "brand_015",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_095",
+        "name": "보론옥수 (33칸)",
+        "brandId": "brand_016",
+        "minValue": 17,
+        "maxValue": 59,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_096",
+        "name": "트윈옥수",
+        "brandId": "brand_016",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_097",
+        "name": "독조",
+        "brandId": "brand_017",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_098",
+        "name": "독조 블랙라벨",
+        "brandId": "brand_017",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_099",
+        "name": "포세이돈 무광",
+        "brandId": "brand_018",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_100",
+        "name": "포세이돈 유광",
+        "brandId": "brand_018",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_101",
+        "name": "제왕 (33칸)",
+        "brandId": "brand_019",
+        "minValue": 17,
+        "maxValue": 59,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_102",
+        "name": "프리미엄 제왕",
+        "brandId": "brand_019",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_103",
+        "name": "제왕 S 스페셜",
+        "brandId": "brand_019",
+        "minValue": 18,
+        "maxValue": 60,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    },
+    {
+        "id": "rod_104",
+        "name": "독존 (33칸)",
+        "brandId": "brand_020",
+        "minValue": 17,
+        "maxValue": 59,
+        "usedPrice": 0.0,
+        "lengthPrices": {}
+    }
+]
