@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fishing_rod_calculator/screens/home_screen.dart';
 import 'package:fishing_rod_calculator/providers/brand_provider.dart';
@@ -10,6 +11,7 @@ import 'package:fishing_rod_calculator/models/fishing_rod.dart';
 void main() {
   group('HomeScreen Widget Tests', () {
     late ProviderContainer container;
+    final NumberFormat numberFormat = NumberFormat('#,###');
 
     setUp(() {
       SharedPreferences.setMockInitialValues({});
@@ -143,7 +145,7 @@ void main() {
       // Then - 계산 결과가 표시되어야 함 (총합 영역에서 확인)
       expect(find.text('5대'), findsOneWidget);
       expect(
-        find.text('225000원'),
+        find.text('${numberFormat.format(225000)}원'),
         findsAtLeastNWidgets(1),
       ); // 개별 계산과 총합에서 모두 나타날 수 있음
     });
@@ -183,7 +185,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // Then - 변경된 할인율로 계산되어야 함
-      expect(find.text('12000원'), findsAtLeastNWidgets(1)); // (10000 * 2) * 0.6
+      expect(
+        find.text('${numberFormat.format(12000)}원'),
+        findsAtLeastNWidgets(1),
+      ); // (10000 * 2) * 0.6
     });
 
     testWidgets('계산 초기화 테스트', (WidgetTester tester) async {

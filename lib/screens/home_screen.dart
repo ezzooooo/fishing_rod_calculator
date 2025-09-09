@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../providers/fishing_rod_provider.dart';
 import '../providers/brand_provider.dart';
 import '../providers/calculation_provider.dart';
@@ -23,6 +24,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final Map<int, TextEditingController> _quantityControllers = {};
   final Map<int, FocusNode> _quantityFocusNodes = {};
 
+  // 숫자 포맷터 (3자리마다 콤마)
+  final NumberFormat _numberFormat = NumberFormat('#,###');
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -37,6 +41,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _initializeQuantityControllers(FishingRod rod) {
+    // 기존 값들을 임시로 저장
+    final Map<int, String> existingValues = {};
+    for (var entry in _quantityControllers.entries) {
+      existingValues[entry.key] = entry.value.text;
+    }
+
     // 기존 컨트롤러들 정리
     for (var controller in _quantityControllers.values) {
       controller.dispose();
@@ -47,10 +57,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _quantityControllers.clear();
     _quantityFocusNodes.clear();
 
-    // 새로운 컨트롤러들 생성
+    // 새로운 컨트롤러들 생성 (기존 값이 있으면 유지, 없으면 0)
     for (int length in rod.availableLengths) {
-      _quantityControllers[length] = TextEditingController(text: '0');
+      final existingValue = existingValues[length] ?? '0';
+      _quantityControllers[length] = TextEditingController(text: existingValue);
       _quantityFocusNodes[length] = FocusNode();
+
+      // 기존 수량 값이 0보다 크면 계산 데이터에 추가
+      final quantity = int.tryParse(existingValue) ?? 0;
+      if (quantity > 0) {
+        ref
+            .read(calculationProvider.notifier)
+            .addCalculationItem(
+              fishingRodId: rod.id,
+              length: length,
+              quantity: quantity,
+              discountRate: 0.7, // 기본 70%
+            );
+      }
     }
   }
 
@@ -60,6 +84,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final nextLength = sortedLengths[currentIndex + 1];
       _quantityFocusNodes[nextLength]?.requestFocus();
     }
+  }
+
+  void _clearQuantityInputs() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('수량 초기화'),
+        content: const Text('모든 칸수의 입력된 수량을 초기화하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                // 모든 수량 입력 필드를 0으로 초기화
+                for (var controller in _quantityControllers.values) {
+                  controller.text = '0';
+                }
+                // 계산 데이터도 초기화
+                ref.read(calculationProvider.notifier).clearAll();
+              });
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('모든 수량이 초기화되었습니다'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.orange),
+            child: const Text('초기화'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -182,40 +243,61 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       const SizedBox(height: 16),
 
                       // 낚시대 선택 드롭다운
-                      DropdownButtonFormField<FishingRod>(
-                        initialValue: filteredRods.contains(_selectedRod)
-                            ? _selectedRod
-                            : null,
-                        decoration: const InputDecoration(
-                          labelText: '낚시대 선택',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.sports),
-                        ),
-                        items: filteredRods.map((rod) {
-                          final brand = brands.firstWhere(
-                            (b) => b.id == rod.brandId,
-                            orElse: () => const Brand(id: '', name: '알 수 없음'),
-                          );
-                          return DropdownMenuItem(
-                            value: rod,
-                            child: Text(
-                              '[${brand.name}] ${rod.name}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<FishingRod>(
+                              initialValue: filteredRods.contains(_selectedRod)
+                                  ? _selectedRod
+                                  : null,
+                              decoration: const InputDecoration(
+                                labelText: '낚시대 선택',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.sports),
+                              ),
+                              items: filteredRods.map((rod) {
+                                final brand = brands.firstWhere(
+                                  (b) => b.id == rod.brandId,
+                                  orElse: () =>
+                                      const Brand(id: '', name: '알 수 없음'),
+                                );
+                                return DropdownMenuItem(
+                                  value: rod,
+                                  child: Text(
+                                    '[${brand.name}] ${rod.name}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (rod) {
+                                setState(() {
+                                  _selectedRod = rod;
+                                  // 낚시대 변경 시 칸수 입력은 유지하고 계산 데이터만 초기화
+                                  ref
+                                      .read(calculationProvider.notifier)
+                                      .clearAll();
+                                  if (rod != null) {
+                                    _initializeQuantityControllers(rod);
+                                  }
+                                });
+                              },
+                            ),
+                          ),
+                          if (_selectedRod != null) ...[
+                            const SizedBox(width: 8),
+                            IconButton(
+                              onPressed: _clearQuantityInputs,
+                              icon: const Icon(Icons.refresh),
+                              tooltip: '수량 초기화',
+                              style: IconButton.styleFrom(
+                                foregroundColor: Colors.orange,
+                                backgroundColor: Colors.orange.withAlpha(25),
                               ),
                             ),
-                          );
-                        }).toList(),
-                        onChanged: (rod) {
-                          setState(() {
-                            _selectedRod = rod;
-                            // 낚시대 변경 시 기존 계산 데이터 초기화
-                            ref.read(calculationProvider.notifier).clearAll();
-                            if (rod != null) {
-                              _initializeQuantityControllers(rod);
-                            }
-                          });
-                        },
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -332,7 +414,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                     ),
                                                   ),
                                                   Text(
-                                                    '${price.toStringAsFixed(0)}원',
+                                                    '${_numberFormat.format(price.toInt())}원',
                                                     style: const TextStyle(
                                                       fontSize: 12,
                                                       fontWeight:
@@ -425,12 +507,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  '계산 결과',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      '계산 결과',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    if (calculations
+                                        .where(
+                                          (c) =>
+                                              c.fishingRodId ==
+                                              _selectedRod!.id,
+                                        )
+                                        .isNotEmpty)
+                                      TextButton.icon(
+                                        onPressed: _showBulkDiscountRateDialog,
+                                        icon: const Icon(Icons.tune, size: 16),
+                                        label: const Text('일괄 매입율'),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: Colors.blue,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                                 const SizedBox(height: 16),
                                 Expanded(
@@ -464,7 +567,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                           ),
                                         )
                                       : ListView.builder(
-                                          padding: const EdgeInsets.all(16),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                          ),
                                           itemCount: calculations
                                               .where(
                                                 (c) =>
@@ -489,119 +594,234 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                             final finalPrice = calculation
                                                 .getFinalPrice(rodPrice);
 
-                                            return Card(
-                                              child: Padding(
-                                                padding: const EdgeInsets.all(
-                                                  16,
-                                                ),
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Row(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .spaceBetween,
-                                                      children: [
-                                                        Text(
+                                            return Container(
+                                              margin: const EdgeInsets.only(
+                                                bottom: 8,
+                                              ),
+                                              child: Card(
+                                                elevation: 2,
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 14,
+                                                        vertical: 12,
+                                                      ),
+                                                  child: Row(
+                                                    children: [
+                                                      // 칸수 × 수량
+                                                      SizedBox(
+                                                        width: 120,
+                                                        child: Text(
                                                           '${calculation.length}칸 × ${calculation.quantity}대',
                                                           style:
                                                               const TextStyle(
-                                                                fontSize: 16,
+                                                                fontSize: 15,
                                                                 fontWeight:
                                                                     FontWeight
                                                                         .bold,
                                                               ),
                                                         ),
-                                                      ],
-                                                    ),
-                                                    const SizedBox(height: 8),
-                                                    Row(
-                                                      children: [
-                                                        const Text('중고가: '),
-                                                        Text(
-                                                          '${rodPrice.toStringAsFixed(0)}원',
-                                                          style:
-                                                              const TextStyle(
+                                                      ),
+                                                      const SizedBox(width: 12),
+
+                                                      // 중고가
+                                                      Expanded(
+                                                        flex: 3,
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            const Text(
+                                                              '중고가',
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                color:
+                                                                    Colors.grey,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                              height: 2,
+                                                            ),
+                                                            Text(
+                                                              '${_numberFormat.format(rodPrice.toInt())}원',
+                                                              style: const TextStyle(
+                                                                fontSize: 14,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+
+                                                      // 총 평균거래가
+                                                      Expanded(
+                                                        flex: 3,
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            const Text(
+                                                              '총 평균거래가',
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                color:
+                                                                    Colors.grey,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                              height: 2,
+                                                            ),
+                                                            Text(
+                                                              '${_numberFormat.format(originalPrice.toInt())}원',
+                                                              style: const TextStyle(
+                                                                fontSize: 14,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+
+                                                      // 매입율
+                                                      SizedBox(
+                                                        width: 80,
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .end,
+                                                          children: [
+                                                            const Text(
+                                                              '매입율',
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                color:
+                                                                    Colors.grey,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                              height: 2,
+                                                            ),
+                                                            ExcludeFocus(
+                                                              child: DropdownButton<double>(
+                                                                value: calculation
+                                                                    .discountRate,
+                                                                isDense: true,
+                                                                underline:
+                                                                    Container(),
+                                                                items:
+                                                                    [
+                                                                      0.4,
+                                                                      0.45,
+                                                                      0.5,
+                                                                      0.55,
+                                                                      0.6,
+                                                                      0.65,
+                                                                      0.7,
+                                                                    ].map((
+                                                                      rate,
+                                                                    ) {
+                                                                      return DropdownMenuItem(
+                                                                        value:
+                                                                            rate,
+                                                                        child: Text(
+                                                                          '${(rate * 100).toInt()}%',
+                                                                          style: const TextStyle(
+                                                                            fontSize:
+                                                                                14,
+                                                                            fontWeight:
+                                                                                FontWeight.w500,
+                                                                          ),
+                                                                        ),
+                                                                      );
+                                                                    }).toList(),
+                                                                onChanged: (rate) {
+                                                                  if (rate !=
+                                                                      null) {
+                                                                    ref
+                                                                        .read(
+                                                                          calculationProvider
+                                                                              .notifier,
+                                                                        )
+                                                                        .updateDiscountRate(
+                                                                          _selectedRod!
+                                                                              .id,
+                                                                          calculation
+                                                                              .length,
+                                                                          rate,
+                                                                        );
+                                                                  }
+                                                                },
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 24),
+
+                                                      // 최종 매입가 (강조)
+                                                      Container(
+                                                        width: 130,
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 12,
+                                                              vertical: 8,
+                                                            ),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors
+                                                              .green
+                                                              .shade50,
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                6,
+                                                              ),
+                                                          border: Border.all(
+                                                            color: Colors
+                                                                .green
+                                                                .shade300,
+                                                            width: 1.5,
+                                                          ),
+                                                        ),
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .end,
+                                                          children: [
+                                                            const Text(
+                                                              '최종 매입가',
+                                                              style: TextStyle(
+                                                                fontSize: 11,
+                                                                color: Colors
+                                                                    .green,
                                                                 fontWeight:
                                                                     FontWeight
                                                                         .w500,
                                                               ),
-                                                        ),
-                                                        const Spacer(),
-                                                        const Text('총 원가: '),
-                                                        Text(
-                                                          '${originalPrice.toStringAsFixed(0)}원',
-                                                          style:
-                                                              const TextStyle(
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                              ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    const SizedBox(height: 8),
-                                                    Row(
-                                                      children: [
-                                                        const Text('할인율: '),
-                                                        ExcludeFocus(
-                                                          child: DropdownButton<double>(
-                                                            value: calculation
-                                                                .discountRate,
-                                                            items:
-                                                                [
-                                                                  0.4,
-                                                                  0.45,
-                                                                  0.5,
-                                                                  0.55,
-                                                                  0.6,
-                                                                  0.65,
-                                                                  0.7,
-                                                                ].map((rate) {
-                                                                  return DropdownMenuItem(
-                                                                    value: rate,
-                                                                    child: Text(
-                                                                      '${(rate * 100).toInt()}%',
-                                                                    ),
-                                                                  );
-                                                                }).toList(),
-                                                            onChanged: (rate) {
-                                                              if (rate !=
-                                                                  null) {
-                                                                ref
-                                                                    .read(
-                                                                      calculationProvider
-                                                                          .notifier,
-                                                                    )
-                                                                    .updateDiscountRate(
-                                                                      _selectedRod!
-                                                                          .id,
-                                                                      calculation
-                                                                          .length,
-                                                                      rate,
-                                                                    );
-                                                              }
-                                                            },
-                                                          ),
-                                                        ),
-                                                        const Spacer(),
-                                                        const Text('최종 가격: '),
-                                                        Text(
-                                                          '${finalPrice.toStringAsFixed(0)}원',
-                                                          style:
-                                                              const TextStyle(
+                                                            ),
+                                                            const SizedBox(
+                                                              height: 2,
+                                                            ),
+                                                            Text(
+                                                              '${_numberFormat.format(finalPrice.toInt())}원',
+                                                              style: const TextStyle(
                                                                 fontWeight:
                                                                     FontWeight
                                                                         .bold,
                                                                 color: Colors
                                                                     .green,
-                                                                fontSize: 16,
+                                                                fontSize: 15,
                                                               ),
+                                                            ),
+                                                          ],
                                                         ),
-                                                      ],
-                                                    ),
-                                                  ],
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ),
                                               ),
                                             );
@@ -649,11 +869,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Column(
                           children: [
                             const Text(
-                              '총 원가',
+                              '총 평균거래가',
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              '${totalOriginalPrice.toStringAsFixed(0)}원',
+                              '${_numberFormat.format(totalOriginalPrice.toInt())}원',
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -664,11 +884,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Column(
                           children: [
                             const Text(
-                              '총 최종 가격',
+                              '총 최종매입가',
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              '${totalFinalPrice.toStringAsFixed(0)}원',
+                              '${_numberFormat.format(totalFinalPrice.toInt())}원',
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -705,6 +925,88 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: const Text('삭제'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showBulkDiscountRateDialog() {
+    double? selectedRate;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('일괄 매입율 설정'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '선택된 낚시대의 모든 칸수에 동일한 매입율을 적용합니다.',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<double>(
+                decoration: const InputDecoration(
+                  labelText: '매입율 선택',
+                  border: OutlineInputBorder(),
+                ),
+                value: selectedRate,
+                items: [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7].map((rate) {
+                  return DropdownMenuItem(
+                    value: rate,
+                    child: Text('${(rate * 100).toInt()}%'),
+                  );
+                }).toList(),
+                onChanged: (rate) {
+                  setState(() {
+                    selectedRate = rate;
+                  });
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: selectedRate == null
+                  ? null
+                  : () {
+                      // 선택된 낚시대의 모든 계산 항목에 매입율 적용
+                      final currentCalculations = ref
+                          .read(calculationProvider)
+                          .where((c) => c.fishingRodId == _selectedRod!.id)
+                          .toList();
+
+                      for (final calculation in currentCalculations) {
+                        ref
+                            .read(calculationProvider.notifier)
+                            .updateDiscountRate(
+                              _selectedRod!.id,
+                              calculation.length,
+                              selectedRate!,
+                            );
+                      }
+
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '모든 칸수에 ${(selectedRate! * 100).toInt()}% 매입율이 적용되었습니다',
+                          ),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    },
+              style: TextButton.styleFrom(
+                foregroundColor: selectedRate == null ? null : Colors.blue,
+              ),
+              child: const Text('적용'),
+            ),
+          ],
+        ),
       ),
     );
   }

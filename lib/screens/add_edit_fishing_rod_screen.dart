@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../providers/fishing_rod_provider.dart';
 import '../providers/brand_provider.dart';
 import '../widgets/app_drawer.dart';
@@ -26,6 +27,9 @@ class _AddEditFishingRodScreenState
 
   String? _selectedBrandId;
   bool _isLoading = false;
+
+  // 숫자 포맷터 (3자리마다 콤마)
+  final NumberFormat _numberFormat = NumberFormat('#,###');
 
   // 칸수 선택 관련
   Set<int> _selectedLengths = <int>{};
@@ -164,6 +168,7 @@ class _AddEditFishingRodScreenState
                                   : (value) {
                                       setState(() {
                                         _selectedBrandId = value;
+                                        // 브랜드 변경 시에는 칸수 입력을 유지
                                       });
                                     },
                               validator: (value) {
@@ -212,16 +217,37 @@ class _AddEditFishingRodScreenState
                                       ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 if (!_isLengthSettingMode)
-                                  TextButton.icon(
-                                    onPressed: _isLoading
-                                        ? null
-                                        : () {
-                                            setState(() {
-                                              _isLengthSettingMode = true;
-                                            });
-                                          },
-                                    icon: const Icon(Icons.settings, size: 16),
-                                    label: const Text('범위 설정'),
+                                  Row(
+                                    children: [
+                                      TextButton.icon(
+                                        onPressed: _isLoading
+                                            ? null
+                                            : _clearAllInputs,
+                                        icon: const Icon(
+                                          Icons.refresh,
+                                          size: 16,
+                                        ),
+                                        label: const Text('초기화'),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: Colors.orange,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      TextButton.icon(
+                                        onPressed: _isLoading
+                                            ? null
+                                            : () {
+                                                setState(() {
+                                                  _isLengthSettingMode = true;
+                                                });
+                                              },
+                                        icon: const Icon(
+                                          Icons.settings,
+                                          size: 16,
+                                        ),
+                                        label: const Text('범위 설정'),
+                                      ),
+                                    ],
                                   ),
                               ],
                             ),
@@ -594,6 +620,49 @@ class _AddEditFishingRodScreenState
     );
   }
 
+  void _clearAllInputs() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('초기화 확인'),
+        content: const Text('칸수 선택과 가격 입력을 모두 초기화하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                // 선택된 칸수들을 모두 해제
+                for (int length in _selectedLengths) {
+                  _priceControllers[length]?.dispose();
+                  _priceFocusNodes[length]?.dispose();
+                }
+                _priceControllers.clear();
+                _priceFocusNodes.clear();
+                _selectedLengths.clear();
+
+                // 범위 설정 값도 초기화
+                _minValueController.clear();
+                _maxValueController.clear();
+              });
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('모든 입력이 초기화되었습니다'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.orange),
+            child: const Text('초기화'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _applyLengthSettings() {
     final minValue = int.tryParse(_minValueController.text);
     final maxValue = int.tryParse(_maxValueController.text);
@@ -678,7 +747,9 @@ class _AddEditFishingRodScreenState
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('모든 칸수에 ${price.toStringAsFixed(0)}원이 적용되었습니다'),
+            content: Text(
+              '모든 칸수에 ${_numberFormat.format(price.toInt())}원이 적용되었습니다',
+            ),
             backgroundColor: Colors.green,
           ),
         );

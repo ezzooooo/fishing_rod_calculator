@@ -158,7 +158,7 @@ class AppDrawer extends StatelessWidget {
             Text('기능:'),
             Text('• 브랜드 관리'),
             Text('• 낚시대 관리'),
-            Text('• 가격 계산 (할인율 적용)'),
+            Text('• 가격 계산 (매입율 적용)'),
             Text('• 데이터 로컬 저장'),
           ],
         ),
