@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import '../providers/fishing_rod_provider.dart';
 import '../providers/brand_provider.dart';
 import '../providers/calculation_provider.dart';
@@ -160,6 +163,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ],
       ),
       drawer: const AppDrawer(currentRoute: '/'),
+      floatingActionButton: calculations.isNotEmpty
+          ? FloatingActionButton.extended(
+              onPressed: () => _showPrintDialog(),
+              icon: const Icon(Icons.print),
+              label: const Text('인쇄 미리보기'),
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            )
+          : null,
       body: fishingRods.isEmpty
           ? const Center(
               child: Column(
@@ -566,266 +578,306 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                             ],
                                           ),
                                         )
-                                      : ListView.builder(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                          ),
-                                          itemCount: calculations
-                                              .where(
-                                                (c) =>
-                                                    c.fishingRodId ==
-                                                    _selectedRod!.id,
-                                              )
-                                              .length,
-                                          itemBuilder: (context, index) {
-                                            final calculation = calculations
-                                                .where(
-                                                  (c) =>
-                                                      c.fishingRodId ==
-                                                      _selectedRod!.id,
-                                                )
-                                                .toList()[index];
-                                            final rodPrice = _selectedRod!
-                                                .getPriceForLength(
-                                                  calculation.length,
-                                                );
-                                            final originalPrice = calculation
-                                                .getTotalPrice(rodPrice);
-                                            final finalPrice = calculation
-                                                .getFinalPrice(rodPrice);
-
-                                            return Container(
-                                              margin: const EdgeInsets.only(
-                                                bottom: 8,
-                                              ),
-                                              child: Card(
-                                                elevation: 2,
-                                                child: Padding(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 14,
-                                                        vertical: 12,
-                                                      ),
-                                                  child: Row(
-                                                    children: [
-                                                      // 칸수 × 수량
-                                                      SizedBox(
-                                                        width: 120,
-                                                        child: Text(
-                                                          '${calculation.length}칸 × ${calculation.quantity}대',
-                                                          style:
-                                                              const TextStyle(
-                                                                fontSize: 15,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 12),
-
-                                                      // 중고가
-                                                      Expanded(
-                                                        flex: 3,
-                                                        child: Column(
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .start,
-                                                          children: [
-                                                            const Text(
-                                                              '중고가',
-                                                              style: TextStyle(
-                                                                fontSize: 12,
-                                                                color:
-                                                                    Colors.grey,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              height: 2,
-                                                            ),
-                                                            Text(
-                                                              '${_numberFormat.format(rodPrice.toInt())}원',
-                                                              style: const TextStyle(
-                                                                fontSize: 14,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w600,
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-
-                                                      // 총 평균거래가
-                                                      Expanded(
-                                                        flex: 3,
-                                                        child: Column(
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .start,
-                                                          children: [
-                                                            const Text(
-                                                              '총 평균거래가',
-                                                              style: TextStyle(
-                                                                fontSize: 12,
-                                                                color:
-                                                                    Colors.grey,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              height: 2,
-                                                            ),
-                                                            Text(
-                                                              '${_numberFormat.format(originalPrice.toInt())}원',
-                                                              style: const TextStyle(
-                                                                fontSize: 14,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-
-                                                      // 매입율
-                                                      SizedBox(
-                                                        width: 80,
-                                                        child: Column(
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .end,
-                                                          children: [
-                                                            const Text(
-                                                              '매입율',
-                                                              style: TextStyle(
-                                                                fontSize: 12,
-                                                                color:
-                                                                    Colors.grey,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              height: 2,
-                                                            ),
-                                                            ExcludeFocus(
-                                                              child: DropdownButton<double>(
-                                                                value: calculation
-                                                                    .discountRate,
-                                                                isDense: true,
-                                                                underline:
-                                                                    Container(),
-                                                                items:
-                                                                    [
-                                                                      0.4,
-                                                                      0.45,
-                                                                      0.5,
-                                                                      0.55,
-                                                                      0.6,
-                                                                      0.65,
-                                                                      0.7,
-                                                                    ].map((
-                                                                      rate,
-                                                                    ) {
-                                                                      return DropdownMenuItem(
-                                                                        value:
-                                                                            rate,
-                                                                        child: Text(
-                                                                          '${(rate * 100).toInt()}%',
-                                                                          style: const TextStyle(
-                                                                            fontSize:
-                                                                                14,
-                                                                            fontWeight:
-                                                                                FontWeight.w500,
-                                                                          ),
-                                                                        ),
-                                                                      );
-                                                                    }).toList(),
-                                                                onChanged: (rate) {
-                                                                  if (rate !=
-                                                                      null) {
-                                                                    ref
-                                                                        .read(
-                                                                          calculationProvider
-                                                                              .notifier,
-                                                                        )
-                                                                        .updateDiscountRate(
-                                                                          _selectedRod!
-                                                                              .id,
-                                                                          calculation
-                                                                              .length,
-                                                                          rate,
-                                                                        );
-                                                                  }
-                                                                },
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 24),
-
-                                                      // 최종 매입가 (강조)
-                                                      Container(
-                                                        width: 130,
-                                                        padding:
-                                                            const EdgeInsets.symmetric(
-                                                              horizontal: 12,
-                                                              vertical: 8,
-                                                            ),
-                                                        decoration: BoxDecoration(
-                                                          color: Colors
-                                                              .green
-                                                              .shade50,
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                6,
-                                                              ),
-                                                          border: Border.all(
-                                                            color: Colors
-                                                                .green
-                                                                .shade300,
-                                                            width: 1.5,
-                                                          ),
-                                                        ),
-                                                        child: Column(
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .end,
-                                                          children: [
-                                                            const Text(
-                                                              '최종 매입가',
-                                                              style: TextStyle(
-                                                                fontSize: 11,
-                                                                color: Colors
-                                                                    .green,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w500,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              height: 2,
-                                                            ),
-                                                            Text(
-                                                              '${_numberFormat.format(finalPrice.toInt())}원',
-                                                              style: const TextStyle(
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                                color: Colors
-                                                                    .green,
-                                                                fontSize: 15,
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                    ],
+                                      : SingleChildScrollView(
+                                          padding: const EdgeInsets.all(8),
+                                          child: DataTable(
+                                            columnSpacing: 16,
+                                            horizontalMargin: 12,
+                                            headingRowHeight: 55,
+                                            dataRowMinHeight: 45,
+                                            dataRowMaxHeight: 45,
+                                            border: TableBorder.all(
+                                              color: Colors.grey.shade300,
+                                              width: 1,
+                                            ),
+                                            headingRowColor:
+                                                WidgetStateProperty.all(
+                                                  Colors.blue.shade50,
+                                                ),
+                                            columns: const [
+                                              DataColumn(
+                                                label: Expanded(
+                                                  child: Text(
+                                                    '칸수',
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 15,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
-                                            );
-                                          },
+                                              DataColumn(
+                                                label: Expanded(
+                                                  child: Text(
+                                                    '수량',
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 15,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              DataColumn(
+                                                label: Expanded(
+                                                  child: Text(
+                                                    '중고가',
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 15,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              DataColumn(
+                                                label: Expanded(
+                                                  child: Text(
+                                                    '총 평균거래가',
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 15,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              DataColumn(
+                                                label: Expanded(
+                                                  child: Text(
+                                                    '매입율',
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 15,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              DataColumn(
+                                                label: Expanded(
+                                                  child: Text(
+                                                    '최종 매입가',
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 15,
+                                                      color: Colors.blue,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                            rows:
+                                                (calculations
+                                                        .where(
+                                                          (c) =>
+                                                              c.fishingRodId ==
+                                                              _selectedRod!.id,
+                                                        )
+                                                        .toList()
+                                                      ..sort(
+                                                        (a, b) =>
+                                                            a.length.compareTo(
+                                                              b.length,
+                                                            ),
+                                                      ))
+                                                    .map((calculation) {
+                                                      final rodPrice =
+                                                          _selectedRod!
+                                                              .getPriceForLength(
+                                                                calculation
+                                                                    .length,
+                                                              );
+                                                      final originalPrice =
+                                                          calculation
+                                                              .getTotalPrice(
+                                                                rodPrice,
+                                                              );
+                                                      final finalPrice =
+                                                          calculation
+                                                              .getFinalPrice(
+                                                                rodPrice,
+                                                              );
+
+                                                      return DataRow(
+                                                        cells: [
+                                                          DataCell(
+                                                            Container(
+                                                              padding:
+                                                                  const EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        8,
+                                                                  ),
+                                                              alignment: Alignment
+                                                                  .centerRight,
+                                                              child: Text(
+                                                                '${calculation.length}칸',
+                                                                style: const TextStyle(
+                                                                  fontSize: 15,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          DataCell(
+                                                            Container(
+                                                              padding:
+                                                                  const EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        8,
+                                                                  ),
+                                                              alignment: Alignment
+                                                                  .centerRight,
+                                                              child: Text(
+                                                                '${calculation.quantity}대',
+                                                                style: const TextStyle(
+                                                                  fontSize: 15,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          DataCell(
+                                                            Container(
+                                                              padding:
+                                                                  const EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        8,
+                                                                  ),
+                                                              alignment: Alignment
+                                                                  .centerRight,
+                                                              child: Text(
+                                                                '${_numberFormat.format(rodPrice.toInt())}원',
+                                                                style:
+                                                                    const TextStyle(
+                                                                      fontSize:
+                                                                          15,
+                                                                    ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          DataCell(
+                                                            Container(
+                                                              padding:
+                                                                  const EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        8,
+                                                                  ),
+                                                              alignment: Alignment
+                                                                  .centerRight,
+                                                              child: Text(
+                                                                '${_numberFormat.format(originalPrice.toInt())}원',
+                                                                style: const TextStyle(
+                                                                  fontSize: 15,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          DataCell(
+                                                            Container(
+                                                              padding:
+                                                                  const EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        8,
+                                                                  ),
+                                                              alignment: Alignment
+                                                                  .centerRight,
+                                                              child: ExcludeFocus(
+                                                                child: DropdownButton<double>(
+                                                                  value: calculation
+                                                                      .discountRate,
+                                                                  isDense: true,
+                                                                  underline:
+                                                                      Container(),
+                                                                  style: const TextStyle(
+                                                                    fontSize:
+                                                                        14,
+                                                                    color: Colors
+                                                                        .black87,
+                                                                  ),
+                                                                  items:
+                                                                      [
+                                                                        0.4,
+                                                                        0.45,
+                                                                        0.5,
+                                                                        0.55,
+                                                                        0.6,
+                                                                        0.65,
+                                                                        0.7,
+                                                                      ].map((
+                                                                        rate,
+                                                                      ) {
+                                                                        return DropdownMenuItem(
+                                                                          value:
+                                                                              rate,
+                                                                          child: Text(
+                                                                            '${(rate * 100).toInt()}%',
+                                                                            style: const TextStyle(
+                                                                              fontSize: 14,
+                                                                            ),
+                                                                          ),
+                                                                        );
+                                                                      }).toList(),
+                                                                  onChanged: (rate) {
+                                                                    if (rate !=
+                                                                        null) {
+                                                                      ref
+                                                                          .read(
+                                                                            calculationProvider.notifier,
+                                                                          )
+                                                                          .updateDiscountRate(
+                                                                            _selectedRod!.id,
+                                                                            calculation.length,
+                                                                            rate,
+                                                                          );
+                                                                    }
+                                                                  },
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          DataCell(
+                                                            Container(
+                                                              padding:
+                                                                  const EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        8,
+                                                                  ),
+                                                              alignment: Alignment
+                                                                  .centerRight,
+                                                              child: Text(
+                                                                '${_numberFormat.format(finalPrice.toInt())}원',
+                                                                style: const TextStyle(
+                                                                  fontSize: 17,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  color: Colors
+                                                                      .blue,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      );
+                                                    })
+                                                    .toList(),
+                                          ),
                                         ),
                                 ),
                               ],
@@ -950,7 +1002,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   labelText: '매입율 선택',
                   border: OutlineInputBorder(),
                 ),
-                value: selectedRate,
+                initialValue: selectedRate,
                 items: [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7].map((rate) {
                   return DropdownMenuItem(
                     value: rate,
@@ -1006,6 +1058,680 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: const Text('적용'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Future<pw.Document> _generatePdf() async {
+    final calculations = ref.read(calculationProvider);
+    final currentCalculations =
+        calculations.where((c) => c.fishingRodId == _selectedRod!.id).toList()
+          ..sort((a, b) => a.length.compareTo(b.length));
+
+    final totalOriginalPrice = ref.read(totalOriginalPriceProvider);
+    final totalFinalPrice = ref.read(totalFinalPriceProvider);
+    final totalQuantity = ref.read(totalQuantityProvider);
+
+    final font = await PdfGoogleFonts.notoSansKRMedium();
+    final boldFont = await PdfGoogleFonts.notoSansKRBold();
+
+    final pdf = pw.Document();
+
+    // 데이터 행 수에 따른 동적 폰트 크기 계산
+    final int totalRows = currentCalculations.length + 2; // 헤더 + 총계 행 포함
+    double titleFontSize = 18;
+    double headerFontSize = 12;
+    double dataFontSize = 11;
+    double cellPadding = 8;
+
+    // 행이 많을수록 폰트 크기와 패딩을 줄임
+    if (totalRows > 30) {
+      titleFontSize = 14;
+      headerFontSize = 9;
+      dataFontSize = 8;
+      cellPadding = 4;
+    } else if (totalRows > 20) {
+      titleFontSize = 16;
+      headerFontSize = 10;
+      dataFontSize = 9;
+      cellPadding = 6;
+    }
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(30),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // 제목
+              pw.Text(
+                '낚시대 계산 결과 - ${_selectedRod!.name}',
+                style: pw.TextStyle(
+                  fontSize: titleFontSize,
+                  fontWeight: pw.FontWeight.bold,
+                  font: boldFont,
+                ),
+              ),
+              pw.SizedBox(height: totalRows > 30 ? 10 : 15),
+
+              // 테이블
+              pw.Expanded(
+                child: pw.Table(
+                  border: pw.TableBorder.all(color: PdfColors.grey400),
+                  columnWidths: {
+                    0: const pw.FlexColumnWidth(1),
+                    1: const pw.FlexColumnWidth(1),
+                    2: const pw.FlexColumnWidth(1.5),
+                    3: const pw.FlexColumnWidth(1.5),
+                    4: const pw.FlexColumnWidth(1),
+                    5: const pw.FlexColumnWidth(1.5),
+                  },
+                  children: [
+                    _buildHeaderRow(
+                      font,
+                      boldFont,
+                      headerFontSize,
+                      cellPadding,
+                    ),
+                    ...currentCalculations.map(
+                      (calculation) => _buildDataRow(
+                        calculation,
+                        font,
+                        dataFontSize,
+                        cellPadding,
+                      ),
+                    ),
+                    _buildTotalRow(
+                      totalQuantity,
+                      totalOriginalPrice,
+                      totalFinalPrice,
+                      font,
+                      boldFont,
+                      headerFontSize,
+                      cellPadding,
+                    ),
+                  ],
+                ),
+              ),
+
+              pw.SizedBox(height: totalRows > 30 ? 5 : 10),
+
+              // 생성 시간
+              pw.Text(
+                '생성일시: ${DateTime.now().toString().substring(0, 19)}',
+                style: pw.TextStyle(
+                  fontSize: totalRows > 30 ? 8 : 10,
+                  color: PdfColors.grey600,
+                  font: font,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf;
+  }
+
+  pw.TableRow _buildHeaderRow(
+    pw.Font font,
+    pw.Font boldFont,
+    double fontSize,
+    double padding,
+  ) {
+    return pw.TableRow(
+      decoration: const pw.BoxDecoration(color: PdfColors.blue100),
+      children: [
+        _buildPdfCell(
+          '칸수',
+          isHeader: true,
+          font: font,
+          boldFont: boldFont,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '수량',
+          isHeader: true,
+          font: font,
+          boldFont: boldFont,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '중고가',
+          isHeader: true,
+          font: font,
+          boldFont: boldFont,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '총 평균거래가',
+          isHeader: true,
+          font: font,
+          boldFont: boldFont,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '매입율',
+          isHeader: true,
+          font: font,
+          boldFont: boldFont,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '최종 매입가',
+          isHeader: true,
+          font: font,
+          boldFont: boldFont,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+      ],
+    );
+  }
+
+  pw.TableRow _buildDataRow(
+    CalculationItem calculation,
+    pw.Font font,
+    double fontSize,
+    double padding,
+  ) {
+    final rodPrice = _selectedRod!.getPriceForLength(calculation.length);
+    final originalPrice = calculation.getTotalPrice(rodPrice);
+    final finalPrice = calculation.getFinalPrice(rodPrice);
+
+    return pw.TableRow(
+      children: [
+        _buildPdfCell(
+          '${calculation.length}칸',
+          font: font,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '${calculation.quantity}대',
+          font: font,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '${_numberFormat.format(rodPrice.toInt())}원',
+          font: font,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '${_numberFormat.format(originalPrice.toInt())}원',
+          font: font,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '${(calculation.discountRate * 100).toInt()}%',
+          font: font,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '${_numberFormat.format(finalPrice.toInt())}원',
+          font: font,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+      ],
+    );
+  }
+
+  pw.TableRow _buildTotalRow(
+    int totalQuantity,
+    double totalOriginalPrice,
+    double totalFinalPrice,
+    pw.Font font,
+    pw.Font boldFont,
+    double fontSize,
+    double padding,
+  ) {
+    return pw.TableRow(
+      decoration: const pw.BoxDecoration(color: PdfColors.blue100),
+      children: [
+        _buildPdfCell(
+          '총계',
+          isHeader: true,
+          font: font,
+          boldFont: boldFont,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '$totalQuantity대',
+          isHeader: true,
+          font: font,
+          boldFont: boldFont,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '-',
+          isHeader: true,
+          font: font,
+          boldFont: boldFont,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '${_numberFormat.format(totalOriginalPrice.toInt())}원',
+          isHeader: true,
+          font: font,
+          boldFont: boldFont,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '-',
+          isHeader: true,
+          font: font,
+          boldFont: boldFont,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+        _buildPdfCell(
+          '${_numberFormat.format(totalFinalPrice.toInt())}원',
+          isHeader: true,
+          font: font,
+          boldFont: boldFont,
+          fontSize: fontSize,
+          padding: padding,
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _buildPdfCell(
+    String text, {
+    bool isHeader = false,
+    pw.Font? font,
+    pw.Font? boldFont,
+    double? fontSize,
+    double? padding,
+  }) {
+    return pw.Container(
+      padding: pw.EdgeInsets.all(padding ?? 8),
+      alignment: isHeader ? pw.Alignment.center : pw.Alignment.centerRight,
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+          fontSize: fontSize ?? (isHeader ? 12 : 11),
+          fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal,
+          font: isHeader ? (boldFont ?? font) : font,
+        ),
+      ),
+    );
+  }
+
+  void _showPrintDialog() {
+    final calculations = ref.read(calculationProvider);
+    final currentCalculations =
+        calculations.where((c) => c.fishingRodId == _selectedRod!.id).toList()
+          ..sort((a, b) => a.length.compareTo(b.length));
+
+    final totalOriginalPrice = ref.read(totalOriginalPriceProvider);
+    final totalFinalPrice = ref.read(totalFinalPriceProvider);
+    final totalQuantity = ref.read(totalQuantityProvider);
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        child: Container(
+          width: 900,
+          height: 1000,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // 데이터 테이블
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    children: [
+                      DataTable(
+                        columnSpacing: 16,
+                        horizontalMargin: 12,
+                        headingRowHeight: 55,
+                        dataRowMinHeight: 45,
+                        dataRowMaxHeight: 45,
+                        border: TableBorder.all(
+                          color: Colors.grey.shade300,
+                          width: 1,
+                        ),
+                        headingRowColor: WidgetStateProperty.all(
+                          Colors.blue.shade50,
+                        ),
+                        columns: const [
+                          DataColumn(
+                            label: Expanded(
+                              child: Text(
+                                '칸수',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Expanded(
+                              child: Text(
+                                '수량',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Expanded(
+                              child: Text(
+                                '중고가',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Expanded(
+                              child: Text(
+                                '총 평균거래가',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Expanded(
+                              child: Text(
+                                '매입율',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Expanded(
+                              child: Text(
+                                '최종 매입가',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        rows: [
+                          // 데이터 행들
+                          ...currentCalculations.map((calculation) {
+                            final rodPrice = _selectedRod!.getPriceForLength(
+                              calculation.length,
+                            );
+                            final originalPrice = calculation.getTotalPrice(
+                              rodPrice,
+                            );
+                            final finalPrice = calculation.getFinalPrice(
+                              rodPrice,
+                            );
+
+                            return DataRow(
+                              cells: [
+                                DataCell(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      '${calculation.length}칸',
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      '${calculation.quantity}대',
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      '${_numberFormat.format(rodPrice.toInt())}원',
+                                      style: const TextStyle(fontSize: 15),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      '${_numberFormat.format(originalPrice.toInt())}원',
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      '${(calculation.discountRate * 100).toInt()}%',
+                                      style: const TextStyle(fontSize: 15),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      '${_numberFormat.format(finalPrice.toInt())}원',
+                                      style: const TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }),
+
+                          // 총계 행
+                          DataRow(
+                            color: WidgetStateProperty.all(
+                              Colors.blue.shade100,
+                            ),
+                            cells: [
+                              DataCell(
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8),
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    '총계',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    '$totalQuantity대',
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8),
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    '-',
+                                    style: TextStyle(fontSize: 15),
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    '${_numberFormat.format(totalOriginalPrice.toInt())}원',
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8),
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    '-',
+                                    style: TextStyle(fontSize: 15),
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    '${_numberFormat.format(totalFinalPrice.toInt())}원',
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // 하단 버튼들
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '생성일시: ${DateTime.now().toString().substring(0, 19)}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          try {
+                            final pdf = await _generatePdf();
+                            await Printing.layoutPdf(
+                              onLayout: (PdfPageFormat format) async =>
+                                  pdf.save(),
+                            );
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('인쇄 오류: $e')),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.print),
+                        label: const Text('인쇄'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('닫기'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
