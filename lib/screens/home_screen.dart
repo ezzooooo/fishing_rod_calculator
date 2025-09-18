@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,6 +27,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _searchQuery = '';
   final Map<int, TextEditingController> _quantityControllers = {};
   final Map<int, FocusNode> _quantityFocusNodes = {};
+  Timer? _debounceTimer;
 
   // 숫자 포맷터 (3자리마다 콤마)
   final NumberFormat _numberFormat = NumberFormat('#,###');
@@ -33,6 +35,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _debounceTimer?.cancel();
     // 수량 컨트롤러들과 포커스 노드들 정리
     for (var controller in _quantityControllers.values) {
       controller.dispose();
@@ -87,6 +90,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final nextLength = sortedLengths[currentIndex + 1];
       _quantityFocusNodes[nextLength]?.requestFocus();
     }
+  }
+
+  void _updateSearchQuery(String query) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      setState(() {
+        _searchQuery = query.trim();
+      });
+    });
   }
 
   void _clearQuantityInputs() {
@@ -207,13 +219,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       TextField(
                         controller: _searchController,
                         decoration: InputDecoration(
-                          hintText: '낚시대 또는 브랜드명으로 검색',
+                          hintText: '낚시대명 또는 브랜드명으로 검색',
                           prefixIcon: const Icon(Icons.search),
-                          suffixIcon: _searchQuery.isNotEmpty
+                          suffixIcon: _searchController.text.isNotEmpty
                               ? IconButton(
                                   icon: const Icon(Icons.clear),
                                   onPressed: () {
                                     _searchController.clear();
+                                    _debounceTimer?.cancel();
                                     setState(() {
                                       _searchQuery = '';
                                     });
@@ -222,36 +235,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               : null,
                           border: const OutlineInputBorder(),
                         ),
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                            // 검색으로 인해 현재 선택된 낚시대가 필터링되면 선택 해제
-                            if (_selectedRod != null) {
-                              final filteredRods = fishingRods.where((rod) {
-                                final brand = brands.firstWhere(
-                                  (b) => b.id == rod.brandId,
-                                  orElse: () =>
-                                      const Brand(id: '', name: '알 수 없음'),
-                                );
-                                final searchLower = _searchQuery.toLowerCase();
-                                return rod.name.toLowerCase().contains(
-                                      searchLower,
-                                    ) ||
-                                    brand.name.toLowerCase().contains(
-                                      searchLower,
-                                    );
-                              }).toList();
-
-                              if (!filteredRods.contains(_selectedRod)) {
-                                _selectedRod = null;
-                                ref
-                                    .read(calculationProvider.notifier)
-                                    .clearAll();
-                              }
-                            }
-                          });
-                        },
+                        onChanged: _updateSearchQuery,
                       ),
+                      if (_searchQuery.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          '총 ${fishingRods.length}개 중 ${filteredRods.length}개 표시',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
 
                       // 낚시대 선택 드롭다운
@@ -267,6 +262,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 border: OutlineInputBorder(),
                                 prefixIcon: Icon(Icons.sports),
                               ),
+                              menuMaxHeight: 300, // 드롭다운 최대 높이 설정
                               items: filteredRods.map((rod) {
                                 final brand = brands.firstWhere(
                                   (b) => b.id == rod.brandId,

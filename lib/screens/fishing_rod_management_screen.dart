@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,13 +7,56 @@ import '../providers/brand_provider.dart';
 import '../models/brand.dart';
 import '../widgets/app_drawer.dart';
 
-class FishingRodManagementScreen extends ConsumerWidget {
+class FishingRodManagementScreen extends ConsumerStatefulWidget {
   const FishingRodManagementScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FishingRodManagementScreen> createState() =>
+      _FishingRodManagementScreenState();
+}
+
+class _FishingRodManagementScreenState
+    extends ConsumerState<FishingRodManagementScreen> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  Timer? _debounceTimer;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounceTimer?.cancel();
+    super.dispose();
+  }
+
+  void _updateSearchQuery(String query) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      setState(() {
+        _searchQuery = query.trim();
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final fishingRods = ref.watch(fishingRodProvider);
     final brands = ref.watch(brandProvider);
+
+    // 검색 필터링 로직
+    final filteredRods = _searchQuery.isEmpty
+        ? fishingRods
+        : fishingRods.where((rod) {
+            final brandName = brands
+                .firstWhere(
+                  (brand) => brand.id == rod.brandId,
+                  orElse: () => const Brand(id: '', name: ''),
+                )
+                .name;
+            return rod.name.toLowerCase().contains(
+                  _searchQuery.toLowerCase(),
+                ) ||
+                brandName.toLowerCase().contains(_searchQuery.toLowerCase());
+          }).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -26,72 +70,159 @@ class FishingRodManagementScreen extends ConsumerWidget {
         ],
       ),
       drawer: const AppDrawer(currentRoute: '/fishing-rods'),
-      body: fishingRods.isEmpty
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.sports_outlined, size: 80, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    '등록된 낚시대가 없습니다',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
+      body: Column(
+        children: [
+          // 검색 바
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.grey.shade50,
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: '낚시대명 또는 브랜드명으로 검색',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              _debounceTimer?.cancel();
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                            },
+                          )
+                        : null,
+                    border: const OutlineInputBorder(),
                   ),
-                  SizedBox(height: 8),
+                  onChanged: _updateSearchQuery,
+                ),
+                if (_searchQuery.isNotEmpty) ...[
+                  const SizedBox(height: 8),
                   Text(
-                    '+ 버튼을 눌러 낚시대를 추가해보세요',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                    '총 ${fishingRods.length}개 중 ${filteredRods.length}개 표시',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: fishingRods.length,
-              itemBuilder: (context, index) {
-                final rod = fishingRods[index];
-                final brand = brands.firstWhere(
-                  (b) => b.id == rod.brandId,
-                  orElse: () => const Brand(id: '', name: '알 수 없음'),
-                );
-
-                return Card(
-                  child: ListTile(
-                    leading: const CircleAvatar(child: Icon(Icons.sports)),
-                    title: Text(
-                      rod.name,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('브랜드: ${brand.name}'),
-                        Text('범위: ${rod.minValue}~${rod.maxValue}'),
-                        Text('중고가: ${rod.usedPrice.toStringAsFixed(0)}원'),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () =>
-                              context.go('/fishing-rods/edit/${rod.id}'),
-                          tooltip: '수정',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () =>
-                              _showDeleteDialog(context, ref, rod.id, rod.name),
-                          tooltip: '삭제',
-                        ),
-                      ],
-                    ),
-                    isThreeLine: true,
-                  ),
-                );
-              },
+              ],
             ),
+          ),
+
+          // 낚시대 목록
+          Expanded(
+            child: fishingRods.isEmpty
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.sports_outlined,
+                          size: 80,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          '등록된 낚시대가 없습니다',
+                          style: TextStyle(fontSize: 18, color: Colors.grey),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '+ 버튼을 눌러 낚시대를 추가해보세요',
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  )
+                : filteredRods.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.search_off,
+                          size: 80,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '검색 결과가 없습니다',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '"$_searchQuery"와 일치하는 낚시대가 없습니다',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filteredRods.length,
+                    itemBuilder: (context, index) {
+                      final rod = filteredRods[index];
+                      final brand = brands.firstWhere(
+                        (b) => b.id == rod.brandId,
+                        orElse: () => const Brand(id: '', name: '알 수 없음'),
+                      );
+
+                      return Card(
+                        child: ListTile(
+                          leading: const CircleAvatar(
+                            child: Icon(Icons.sports),
+                          ),
+                          title: Text(
+                            rod.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('브랜드: ${brand.name}'),
+                              Text('범위: ${rod.minValue}~${rod.maxValue}'),
+                              Text('중고가: ${rod.usedPrice.toStringAsFixed(0)}원'),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit),
+                                onPressed: () =>
+                                    context.go('/fishing-rods/edit/${rod.id}'),
+                                tooltip: '수정',
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () => _showDeleteDialog(
+                                  context,
+                                  ref,
+                                  rod.id,
+                                  rod.name,
+                                ),
+                                tooltip: '삭제',
+                              ),
+                            ],
+                          ),
+                          isThreeLine: true,
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

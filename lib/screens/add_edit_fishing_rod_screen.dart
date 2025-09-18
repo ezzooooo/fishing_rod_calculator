@@ -60,10 +60,11 @@ class _AddEditFishingRodScreenState
       // 기존 낚시대의 칸수들을 선택된 상태로 설정
       _selectedLengths = rod.availableLengths.toSet();
 
-      // 각 칸수에 대해 같은 가격으로 초기화
+      // 각 칸수에 대해 개별 가격으로 초기화 (없으면 기본 가격 사용)
       for (int length in _selectedLengths) {
+        final price = rod.getPriceForLength(length);
         _priceControllers[length] = TextEditingController(
-          text: rod.usedPrice.toStringAsFixed(0),
+          text: price.toStringAsFixed(0),
         );
         _priceFocusNodes[length] = FocusNode();
       }
