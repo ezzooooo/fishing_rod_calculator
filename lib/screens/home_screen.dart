@@ -1372,7 +1372,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  static const int _printPreviewSplitThreshold = 14;
+  static const int _printPreviewSplitThreshold = 11;
 
   String _formatDateTime(DateTime dateTime) {
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(dateTime);
@@ -1442,7 +1442,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               _buildPrintPreviewInfoChip('생성일시', _formatDateTime(generatedAt)),
               if (isSplitLayout)
-                _buildPrintPreviewInfoChip('레이아웃', '14행 초과로 좌/우 분할'),
+                _buildPrintPreviewInfoChip(
+                  '레이아웃',
+                  '$_printPreviewSplitThreshold행 초과로 좌/우 분할',
+                ),
             ],
           ),
         ],
@@ -1857,7 +1860,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     children: [
                       Text(
                         isSplitLayout
-                            ? '14행 초과로 좌/우 분할 표시 중'
+                            ? '$_printPreviewSplitThreshold행 초과로 좌/우 분할 표시 중'
                             : '생성일시: ${_formatDateTime(generatedAt)}',
                         style: TextStyle(
                           fontSize: 12,
