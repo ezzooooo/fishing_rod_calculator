@@ -38,6 +38,22 @@ flutterfire configure \
 - `ios/Runner/GoogleService-Info.plist`
 - `macos/Runner/GoogleService-Info.plist`
 
+보안 주의:
+- 위 파일에는 API Key가 포함될 수 있으므로 그대로 커밋하지 마세요.
+- 저장소에는 플레이스홀더만 유지하고, 실제 키는 로컬/CI에서 주입하세요.
+
+### dart-define 주입
+
+`lib/firebase_options.dart`는 API Key를 `--dart-define`으로 받습니다.
+
+```bash
+export FIREBASE_WEB_API_KEY="<your-web-api-key>"
+export FIREBASE_ANDROID_API_KEY="<your-android-api-key>"
+export FIREBASE_IOS_API_KEY="<your-ios-api-key>"
+# 선택: Windows에서 web 키와 다를 때만
+export FIREBASE_WINDOWS_API_KEY="<your-windows-api-key>"
+```
+
 ### Firebase Console 설정
 
 1. Authentication -> Sign-in method -> Email/Password 활성화
@@ -57,7 +73,8 @@ firebase deploy --only firestore:rules --project frc-staff-juwon-20260226
 ## 2) 로컬 실행
 
 ```bash
-flutter run -d chrome
+flutter run -d chrome \
+  --dart-define=FIREBASE_WEB_API_KEY=$FIREBASE_WEB_API_KEY
 ```
 
 ## 3) Cloudflare Pages 배포
@@ -65,7 +82,8 @@ flutter run -d chrome
 ### 빌드
 
 ```bash
-flutter build web --release
+flutter build web --release \
+  --dart-define=FIREBASE_WEB_API_KEY=$FIREBASE_WEB_API_KEY
 ```
 
 ### 배포
