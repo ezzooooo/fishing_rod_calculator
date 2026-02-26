@@ -9,6 +9,7 @@ class BrandManagementScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isMobileLayout = MediaQuery.sizeOf(context).width < 600;
     final brands = ref.watch(brandProvider);
 
     return Scaffold(
@@ -52,6 +53,8 @@ class BrandManagementScreen extends ConsumerWidget {
                     leading: const CircleAvatar(child: Icon(Icons.business)),
                     title: Text(
                       brand.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     subtitle: brand.createdAt != null
@@ -59,27 +62,52 @@ class BrandManagementScreen extends ConsumerWidget {
                             '등록일: ${brand.createdAt!.year}-${brand.createdAt!.month.toString().padLeft(2, '0')}-${brand.createdAt!.day.toString().padLeft(2, '0')}',
                           )
                         : null,
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () =>
-                              context.go('/brands/edit/${brand.id}'),
-                          tooltip: '수정',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _showDeleteDialog(
-                            context,
-                            ref,
-                            brand.id,
-                            brand.name,
+                    trailing: isMobileLayout
+                        ? PopupMenuButton<String>(
+                            tooltip: '더보기',
+                            onSelected: (value) {
+                              if (value == 'edit') {
+                                context.go('/brands/edit/${brand.id}');
+                                return;
+                              }
+                              if (value == 'delete') {
+                                _showDeleteDialog(
+                                  context,
+                                  ref,
+                                  brand.id,
+                                  brand.name,
+                                );
+                              }
+                            },
+                            itemBuilder: (context) => const [
+                              PopupMenuItem(value: 'edit', child: Text('수정')),
+                              PopupMenuItem(value: 'delete', child: Text('삭제')),
+                            ],
+                          )
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit),
+                                onPressed: () =>
+                                    context.go('/brands/edit/${brand.id}'),
+                                tooltip: '수정',
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () => _showDeleteDialog(
+                                  context,
+                                  ref,
+                                  brand.id,
+                                  brand.name,
+                                ),
+                                tooltip: '삭제',
+                              ),
+                            ],
                           ),
-                          tooltip: '삭제',
-                        ),
-                      ],
-                    ),
                   ),
                 );
               },

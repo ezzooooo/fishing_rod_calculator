@@ -405,6 +405,7 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobileLayout = MediaQuery.sizeOf(context).width < 700;
     final brands = ref.watch(brandProvider);
     final fishingRods = ref.watch(fishingRodProvider);
 
@@ -416,151 +417,171 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
       drawer: const AppDrawer(currentRoute: '/system-settings'),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 브랜드 관리 섹션
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.business, color: Colors.blue),
-                              const SizedBox(width: 8),
-                              Text(
-                                '브랜드 관리',
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '현재 브랜드: ${brands.length}개',
-                            style: TextStyle(color: Colors.grey.shade600),
-                          ),
-                          const SizedBox(height: 16),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              ElevatedButton.icon(
-                                onPressed: _loadDefaultBrands,
-                                icon: const Icon(Icons.download),
-                                label: const Text('기본 브랜드 불러오기'),
-                              ),
-                              ElevatedButton.icon(
-                                onPressed: _exportBrands,
-                                icon: const Icon(Icons.upload),
-                                label: const Text('브랜드 내보내기'),
-                              ),
-                              ElevatedButton.icon(
-                                onPressed: _importBrands,
-                                icon: const Icon(Icons.folder_open),
-                                label: const Text('브랜드 불러오기'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: isMobileLayout ? double.infinity : 1000,
                   ),
-
-                  const SizedBox(height: 16),
-
-                  // 낚시대 관리 섹션
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 브랜드 관리 섹션
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.sports, color: Colors.green),
-                              const SizedBox(width: 8),
+                              Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  const Icon(
+                                    Icons.business,
+                                    color: Colors.blue,
+                                  ),
+                                  Text(
+                                    '브랜드 관리',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
                               Text(
-                                '낚시대 관리',
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.bold),
+                                '현재 브랜드: ${brands.length}개',
+                                style: TextStyle(color: Colors.grey.shade600),
+                              ),
+                              const SizedBox(height: 16),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: _loadDefaultBrands,
+                                    icon: const Icon(Icons.download),
+                                    label: const Text('기본 브랜드 불러오기'),
+                                  ),
+                                  ElevatedButton.icon(
+                                    onPressed: _exportBrands,
+                                    icon: const Icon(Icons.upload),
+                                    label: const Text('브랜드 내보내기'),
+                                  ),
+                                  ElevatedButton.icon(
+                                    onPressed: _importBrands,
+                                    icon: const Icon(Icons.folder_open),
+                                    label: const Text('브랜드 불러오기'),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '현재 낚시대: ${fishingRods.length}개',
-                            style: TextStyle(color: Colors.grey.shade600),
-                          ),
-                          const SizedBox(height: 16),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              ElevatedButton.icon(
-                                onPressed: _loadDefaultFishingRods,
-                                icon: const Icon(Icons.download),
-                                label: const Text('기본 낚시대 불러오기'),
-                              ),
-                              ElevatedButton.icon(
-                                onPressed: _exportFishingRods,
-                                icon: const Icon(Icons.upload),
-                                label: const Text('낚시대 내보내기'),
-                              ),
-                              ElevatedButton.icon(
-                                onPressed: _importFishingRods,
-                                icon: const Icon(Icons.folder_open),
-                                label: const Text('낚시대 불러오기'),
-                              ),
-                            ],
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
 
-                  const SizedBox(height: 24),
+                      const SizedBox(height: 16),
 
-                  // 주의사항
-                  Card(
-                    color: Colors.orange.shade50,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                      // 낚시대 관리 섹션
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                Icons.warning,
-                                color: Colors.orange.shade700,
+                              Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  const Icon(Icons.sports, color: Colors.green),
+                                  Text(
+                                    '낚시대 관리',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(height: 8),
                               Text(
-                                '주의사항',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.orange.shade700,
-                                ),
+                                '현재 낚시대: ${fishingRods.length}개',
+                                style: TextStyle(color: Colors.grey.shade600),
+                              ),
+                              const SizedBox(height: 16),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: _loadDefaultFishingRods,
+                                    icon: const Icon(Icons.download),
+                                    label: const Text('기본 낚시대 불러오기'),
+                                  ),
+                                  ElevatedButton.icon(
+                                    onPressed: _exportFishingRods,
+                                    icon: const Icon(Icons.upload),
+                                    label: const Text('낚시대 내보내기'),
+                                  ),
+                                  ElevatedButton.icon(
+                                    onPressed: _importFishingRods,
+                                    icon: const Icon(Icons.folder_open),
+                                    label: const Text('낚시대 불러오기'),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            '• 데이터를 불러올 때 기존 데이터는 모두 삭제됩니다.\n'
-                            '• 중요한 데이터는 미리 내보내기를 통해 백업하세요.\n'
-                            '• JSON 파일 형식만 지원됩니다.',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+
+                      const SizedBox(height: 24),
+
+                      // 주의사항
+                      Card(
+                        color: Colors.orange.shade50,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  Icon(
+                                    Icons.warning,
+                                    color: Colors.orange.shade700,
+                                  ),
+                                  Text(
+                                    '주의사항',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                '• 데이터를 불러올 때 기존 데이터는 모두 삭제됩니다.\n'
+                                '• 중요한 데이터는 미리 내보내기를 통해 백업하세요.\n'
+                                '• JSON 파일 형식만 지원됩니다.',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
     );

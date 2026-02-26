@@ -39,6 +39,7 @@ class _FishingRodManagementScreenState
 
   @override
   Widget build(BuildContext context) {
+    final isMobileLayout = MediaQuery.sizeOf(context).width < 600;
     final fishingRods = ref.watch(fishingRodProvider);
     final brands = ref.watch(brandProvider);
 
@@ -181,6 +182,8 @@ class _FishingRodManagementScreenState
                           ),
                           title: Text(
                             rod.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           subtitle: Column(
@@ -191,30 +194,61 @@ class _FishingRodManagementScreenState
                               Text('중고가: ${rod.usedPrice.toStringAsFixed(0)}원'),
                             ],
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit),
-                                onPressed: () =>
-                                    context.go('/fishing-rods/edit/${rod.id}'),
-                                tooltip: '수정',
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.delete,
-                                  color: Colors.red,
+                          trailing: isMobileLayout
+                              ? PopupMenuButton<String>(
+                                  tooltip: '더보기',
+                                  onSelected: (value) {
+                                    if (value == 'edit') {
+                                      context.go(
+                                        '/fishing-rods/edit/${rod.id}',
+                                      );
+                                      return;
+                                    }
+                                    if (value == 'delete') {
+                                      _showDeleteDialog(
+                                        context,
+                                        ref,
+                                        rod.id,
+                                        rod.name,
+                                      );
+                                    }
+                                  },
+                                  itemBuilder: (context) => const [
+                                    PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('수정'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text('삭제'),
+                                    ),
+                                  ],
+                                )
+                              : Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit),
+                                      onPressed: () => context.go(
+                                        '/fishing-rods/edit/${rod.id}',
+                                      ),
+                                      tooltip: '수정',
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: () => _showDeleteDialog(
+                                        context,
+                                        ref,
+                                        rod.id,
+                                        rod.name,
+                                      ),
+                                      tooltip: '삭제',
+                                    ),
+                                  ],
                                 ),
-                                onPressed: () => _showDeleteDialog(
-                                  context,
-                                  ref,
-                                  rod.id,
-                                  rod.name,
-                                ),
-                                tooltip: '삭제',
-                              ),
-                            ],
-                          ),
                           isThreeLine: true,
                         ),
                       );

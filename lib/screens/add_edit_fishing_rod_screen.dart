@@ -90,6 +90,7 @@ class _AddEditFishingRodScreenState
 
   @override
   Widget build(BuildContext context) {
+    final isMobileLayout = MediaQuery.sizeOf(context).width < 900;
     final brands = ref.watch(brandProvider);
 
     return Scaffold(
@@ -135,486 +136,767 @@ class _AddEditFishingRodScreenState
               key: _formKey,
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // 기본 정보 카드
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '기본 정보',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 16),
-                            DropdownButtonFormField<String>(
-                              initialValue: _selectedBrandId,
-                              decoration: const InputDecoration(
-                                labelText: '브랜드',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.business),
-                              ),
-                              items: brands.map((brand) {
-                                return DropdownMenuItem(
-                                  value: brand.id,
-                                  child: Text(brand.name),
-                                );
-                              }).toList(),
-                              onChanged: _isLoading
-                                  ? null
-                                  : (value) {
-                                      setState(() {
-                                        _selectedBrandId = value;
-                                        // 브랜드 변경 시에는 칸수 입력을 유지
-                                      });
-                                    },
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return '브랜드를 선택해주세요';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _nameController,
-                              decoration: const InputDecoration(
-                                labelText: '낚시대명',
-                                hintText: '낚시대명을 입력하세요',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.sports),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return '낚시대명을 입력해주세요';
-                                }
-                                return null;
-                              },
-                              enabled: !_isLoading,
-                            ),
-                          ],
-                        ),
-                      ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isMobileLayout ? double.infinity : 980,
                     ),
-                    const SizedBox(height: 16),
-
-                    // 칸수 선택 카드
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // 기본 정보 카드
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '칸수 선택',
+                                  '기본 정보',
                                   style: Theme.of(context).textTheme.titleMedium
                                       ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
-                                if (!_isLengthSettingMode)
-                                  Row(
-                                    children: [
-                                      TextButton.icon(
-                                        onPressed: _isLoading
-                                            ? null
-                                            : _clearAllInputs,
-                                        icon: const Icon(
-                                          Icons.refresh,
-                                          size: 16,
-                                        ),
-                                        label: const Text('초기화'),
-                                        style: TextButton.styleFrom(
-                                          foregroundColor: Colors.orange,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      TextButton.icon(
-                                        onPressed: _isLoading
-                                            ? null
-                                            : () {
-                                                setState(() {
-                                                  _isLengthSettingMode = true;
-                                                });
-                                              },
-                                        icon: const Icon(
-                                          Icons.settings,
-                                          size: 16,
-                                        ),
-                                        label: const Text('범위 설정'),
-                                      ),
-                                    ],
+                                const SizedBox(height: 16),
+                                DropdownButtonFormField<String>(
+                                  initialValue: _selectedBrandId,
+                                  decoration: const InputDecoration(
+                                    labelText: '브랜드',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.business),
                                   ),
+                                  items: brands.map((brand) {
+                                    return DropdownMenuItem(
+                                      value: brand.id,
+                                      child: Text(brand.name),
+                                    );
+                                  }).toList(),
+                                  onChanged: _isLoading
+                                      ? null
+                                      : (value) {
+                                          setState(() {
+                                            _selectedBrandId = value;
+                                            // 브랜드 변경 시에는 칸수 입력을 유지
+                                          });
+                                        },
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return '브랜드를 선택해주세요';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _nameController,
+                                  decoration: const InputDecoration(
+                                    labelText: '낚시대명',
+                                    hintText: '낚시대명을 입력하세요',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.sports),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return '낚시대명을 입력해주세요';
+                                    }
+                                    return null;
+                                  },
+                                  enabled: !_isLoading,
+                                ),
                               ],
                             ),
-                            const SizedBox(height: 16),
-
-                            // 범위 설정 모드
-                            if (_isLengthSettingMode) ...[
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.blue.shade200,
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      '범위로 칸수 설정',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: TextFormField(
-                                            controller: _minValueController,
-                                            decoration: const InputDecoration(
-                                              labelText: '최소값',
-                                              border: OutlineInputBorder(),
-                                              suffixText: '칸',
-                                              isDense: true,
-                                            ),
-                                            keyboardType: TextInputType.number,
-                                            inputFormatters: [
-                                              FilteringTextInputFormatter
-                                                  .digitsOnly,
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: TextFormField(
-                                            controller: _maxValueController,
-                                            decoration: const InputDecoration(
-                                              labelText: '최대값',
-                                              border: OutlineInputBorder(),
-                                              suffixText: '칸',
-                                              isDense: true,
-                                            ),
-                                            keyboardType: TextInputType.number,
-                                            inputFormatters: [
-                                              FilteringTextInputFormatter
-                                                  .digitsOnly,
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: ElevatedButton(
-                                            onPressed: _applyLengthSettings,
-                                            child: const Text('적용'),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: OutlinedButton(
-                                            onPressed: () => setState(
-                                              () =>
-                                                  _isLengthSettingMode = false,
-                                            ),
-                                            child: const Text('취소'),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-
-                            // 칸수 선택 칩들 (16~80)
-                            Text(
-                              '사용 가능한 칸수 (탭하여 선택/해제)',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(fontWeight: FontWeight.w500),
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: List.generate(65, (index) {
-                                final length =
-                                    16 + (index); // 16, 18, 20, ..., 80
-                                final isSelected = _selectedLengths.contains(
-                                  length,
-                                );
-
-                                return FilterChip(
-                                  label: Text('$length칸'),
-                                  selected: isSelected,
-                                  onSelected: _isLoading
-                                      ? null
-                                      : (selected) {
-                                          _toggleLengthSelection(length);
-                                        },
-                                  backgroundColor: Colors.grey.shade100,
-                                  selectedColor: Colors.blue.shade100,
-                                  checkmarkColor: Colors.blue.shade700,
-                                );
-                              }),
-                            ),
-
-                            if (_selectedLengths.isNotEmpty) ...[
-                              const SizedBox(height: 16),
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.green.shade200,
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '선택된 칸수: ${_selectedLengths.length}개',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Wrap(
-                                      spacing: 4,
-                                      runSpacing: 4,
-                                      children:
-                                          (_selectedLengths.toList()..sort())
-                                              .map((length) {
-                                                return Chip(
-                                                  label: Text('$length칸'),
-                                                  backgroundColor:
-                                                      Colors.green.shade100,
-                                                  deleteIcon: const Icon(
-                                                    Icons.close,
-                                                    size: 16,
-                                                  ),
-                                                  onDeleted: () =>
-                                                      _toggleLengthSelection(
-                                                        length,
-                                                      ),
-                                                );
-                                              })
-                                              .toList(),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // 가격 정보 카드
-                    if (_selectedLengths.isNotEmpty)
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '가격 정보 (칸수별)',
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '각 칸수별로 중고가를 입력하세요. Tab 키로 다음 필드로 이동할 수 있습니다.',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-
-                              // 칸수별 가격 입력 리스트
-                              ...(_selectedLengths.toList()..sort()).map((
-                                length,
-                              ) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 12.0),
-                                  child: Row(
-                                    children: [
-                                      // 칸수 라벨
-                                      Container(
-                                        width: 80,
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 12,
-                                          horizontal: 16,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.blue.shade50,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.blue.shade200,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          '$length칸',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-
-                                      // 가격 입력 필드
-                                      Expanded(
-                                        child: TextFormField(
-                                          controller: _priceControllers[length],
-                                          focusNode: _priceFocusNodes[length],
-                                          decoration: InputDecoration(
-                                            labelText: '중고가',
-                                            hintText: '가격 입력',
-                                            border: const OutlineInputBorder(),
-                                            prefixIcon: const Icon(
-                                              Icons.attach_money,
-                                              size: 20,
-                                            ),
-                                            suffixText: '원',
-                                            isDense: true,
-                                            errorStyle: const TextStyle(
-                                              fontSize: 11,
-                                            ),
-                                          ),
-                                          keyboardType: TextInputType.number,
-                                          inputFormatters: [
-                                            FilteringTextInputFormatter
-                                                .digitsOnly,
-                                          ],
-                                          textInputAction: TextInputAction.next,
-                                          onFieldSubmitted: (_) =>
-                                              _focusNextPriceField(length),
-                                          validator: (value) {
-                                            if (value == null ||
-                                                value.isEmpty) {
-                                              return '가격을 입력해주세요';
-                                            }
-                                            final doubleValue = double.tryParse(
-                                              value,
-                                            );
-                                            if (doubleValue == null ||
-                                                doubleValue < 0) {
-                                              return '유효한 가격을 입력해주세요';
-                                            }
-                                            return null;
-                                          },
-                                          enabled: !_isLoading,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }),
-
-                              // 일괄 가격 설정 기능
-                              const SizedBox(height: 16),
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.orange.shade200,
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      '일괄 가격 설정',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: TextFormField(
-                                            key: const ValueKey('bulk_price'),
-                                            decoration: const InputDecoration(
-                                              labelText: '모든 칸수에 적용할 가격',
-                                              border: OutlineInputBorder(),
-                                              suffixText: '원',
-                                              isDense: true,
-                                            ),
-                                            keyboardType: TextInputType.number,
-                                            inputFormatters: [
-                                              FilteringTextInputFormatter
-                                                  .digitsOnly,
-                                            ],
-                                            onFieldSubmitted: (value) =>
-                                                _applyBulkPrice(value),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        ElevatedButton(
-                                          onPressed: _showBulkPriceDialog,
-                                          child: const Text('적용'),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
                           ),
                         ),
-                      ),
-                    const SizedBox(height: 24),
+                        const SizedBox(height: 16),
 
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _saveFishingRod,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: Theme.of(context).primaryColor,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
+                        // 칸수 선택 카드
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (isMobileLayout)
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '칸수 선택',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                      ),
+                                      if (!_isLengthSettingMode) ...[
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: [
+                                            TextButton.icon(
+                                              onPressed: _isLoading
+                                                  ? null
+                                                  : _clearAllInputs,
+                                              icon: const Icon(
+                                                Icons.refresh,
+                                                size: 16,
+                                              ),
+                                              label: const Text('초기화'),
+                                              style: TextButton.styleFrom(
+                                                foregroundColor: Colors.orange,
+                                              ),
+                                            ),
+                                            TextButton.icon(
+                                              onPressed: _isLoading
+                                                  ? null
+                                                  : () {
+                                                      setState(() {
+                                                        _isLengthSettingMode =
+                                                            true;
+                                                      });
+                                                    },
+                                              icon: const Icon(
+                                                Icons.settings,
+                                                size: 16,
+                                              ),
+                                              label: const Text('범위 설정'),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  )
+                                else
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        '칸수 선택',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                      ),
+                                      if (!_isLengthSettingMode)
+                                        Row(
+                                          children: [
+                                            TextButton.icon(
+                                              onPressed: _isLoading
+                                                  ? null
+                                                  : _clearAllInputs,
+                                              icon: const Icon(
+                                                Icons.refresh,
+                                                size: 16,
+                                              ),
+                                              label: const Text('초기화'),
+                                              style: TextButton.styleFrom(
+                                                foregroundColor: Colors.orange,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            TextButton.icon(
+                                              onPressed: _isLoading
+                                                  ? null
+                                                  : () {
+                                                      setState(() {
+                                                        _isLengthSettingMode =
+                                                            true;
+                                                      });
+                                                    },
+                                              icon: const Icon(
+                                                Icons.settings,
+                                                size: 16,
+                                              ),
+                                              label: const Text('범위 설정'),
+                                            ),
+                                          ],
+                                        ),
+                                    ],
+                                  ),
+                                const SizedBox(height: 16),
+
+                                // 범위 설정 모드
+                                if (_isLengthSettingMode) ...[
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.blue.shade200,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          '범위로 칸수 설정',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        if (isMobileLayout)
+                                          Column(
+                                            children: [
+                                              TextFormField(
+                                                controller: _minValueController,
+                                                decoration:
+                                                    const InputDecoration(
+                                                      labelText: '최소값',
+                                                      border:
+                                                          OutlineInputBorder(),
+                                                      suffixText: '칸',
+                                                      isDense: true,
+                                                    ),
+                                                keyboardType:
+                                                    TextInputType.number,
+                                                inputFormatters: [
+                                                  FilteringTextInputFormatter
+                                                      .digitsOnly,
+                                                ],
+                                              ),
+                                              const SizedBox(height: 8),
+                                              TextFormField(
+                                                controller: _maxValueController,
+                                                decoration:
+                                                    const InputDecoration(
+                                                      labelText: '최대값',
+                                                      border:
+                                                          OutlineInputBorder(),
+                                                      suffixText: '칸',
+                                                      isDense: true,
+                                                    ),
+                                                keyboardType:
+                                                    TextInputType.number,
+                                                inputFormatters: [
+                                                  FilteringTextInputFormatter
+                                                      .digitsOnly,
+                                                ],
+                                              ),
+                                            ],
+                                          )
+                                        else
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: TextFormField(
+                                                  controller:
+                                                      _minValueController,
+                                                  decoration:
+                                                      const InputDecoration(
+                                                        labelText: '최소값',
+                                                        border:
+                                                            OutlineInputBorder(),
+                                                        suffixText: '칸',
+                                                        isDense: true,
+                                                      ),
+                                                  keyboardType:
+                                                      TextInputType.number,
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter
+                                                        .digitsOnly,
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: TextFormField(
+                                                  controller:
+                                                      _maxValueController,
+                                                  decoration:
+                                                      const InputDecoration(
+                                                        labelText: '최대값',
+                                                        border:
+                                                            OutlineInputBorder(),
+                                                        suffixText: '칸',
+                                                        isDense: true,
+                                                      ),
+                                                  keyboardType:
+                                                      TextInputType.number,
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter
+                                                        .digitsOnly,
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        const SizedBox(height: 12),
+                                        if (isMobileLayout)
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              ElevatedButton(
+                                                onPressed: _applyLengthSettings,
+                                                child: const Text('적용'),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              OutlinedButton(
+                                                onPressed: () => setState(
+                                                  () => _isLengthSettingMode =
+                                                      false,
+                                                ),
+                                                child: const Text('취소'),
+                                              ),
+                                            ],
+                                          )
+                                        else
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: ElevatedButton(
+                                                  onPressed:
+                                                      _applyLengthSettings,
+                                                  child: const Text('적용'),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: OutlinedButton(
+                                                  onPressed: () => setState(
+                                                    () => _isLengthSettingMode =
+                                                        false,
+                                                  ),
+                                                  child: const Text('취소'),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                ],
+
+                                // 칸수 선택 칩들 (16~80)
+                                Text(
+                                  '사용 가능한 칸수 (탭하여 선택/해제)',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w500),
                                 ),
-                              ),
-                            )
-                          : Text(
-                              isEditing ? '수정 완료' : '낚시대 추가',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: List.generate(65, (index) {
+                                    final length =
+                                        16 + (index); // 16, 18, 20, ..., 80
+                                    final isSelected = _selectedLengths
+                                        .contains(length);
+
+                                    return FilterChip(
+                                      label: Text('$length칸'),
+                                      selected: isSelected,
+                                      onSelected: _isLoading
+                                          ? null
+                                          : (selected) {
+                                              _toggleLengthSelection(length);
+                                            },
+                                      backgroundColor: Colors.grey.shade100,
+                                      selectedColor: Colors.blue.shade100,
+                                      checkmarkColor: Colors.blue.shade700,
+                                    );
+                                  }),
+                                ),
+
+                                if (_selectedLengths.isNotEmpty) ...[
+                                  const SizedBox(height: 16),
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.green.shade200,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '선택된 칸수: ${_selectedLengths.length}개',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                          spacing: 4,
+                                          runSpacing: 4,
+                                          children:
+                                              (_selectedLengths.toList()
+                                                    ..sort())
+                                                  .map((length) {
+                                                    return Chip(
+                                                      label: Text('$length칸'),
+                                                      backgroundColor:
+                                                          Colors.green.shade100,
+                                                      deleteIcon: const Icon(
+                                                        Icons.close,
+                                                        size: 16,
+                                                      ),
+                                                      onDeleted: () =>
+                                                          _toggleLengthSelection(
+                                                            length,
+                                                          ),
+                                                    );
+                                                  })
+                                                  .toList(),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // 가격 정보 카드
+                        if (_selectedLengths.isNotEmpty)
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '가격 정보 (칸수별)',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    isMobileLayout
+                                        ? '각 칸수별로 중고가를 입력하세요.'
+                                        : '각 칸수별로 중고가를 입력하세요. Tab 키로 다음 필드로 이동할 수 있습니다.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // 칸수별 가격 입력 리스트
+                                  ...(_selectedLengths.toList()..sort()).map((
+                                    length,
+                                  ) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 12.0,
+                                      ),
+                                      child: isMobileLayout
+                                          ? Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 8,
+                                                        horizontal: 12,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.blue.shade50,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          8,
+                                                        ),
+                                                    border: Border.all(
+                                                      color:
+                                                          Colors.blue.shade200,
+                                                    ),
+                                                  ),
+                                                  child: Text(
+                                                    '$length칸',
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                TextFormField(
+                                                  controller:
+                                                      _priceControllers[length],
+                                                  focusNode:
+                                                      _priceFocusNodes[length],
+                                                  decoration: InputDecoration(
+                                                    labelText: '중고가',
+                                                    hintText: '가격 입력',
+                                                    border:
+                                                        const OutlineInputBorder(),
+                                                    prefixIcon: const Icon(
+                                                      Icons.attach_money,
+                                                      size: 20,
+                                                    ),
+                                                    suffixText: '원',
+                                                    isDense: true,
+                                                    errorStyle: const TextStyle(
+                                                      fontSize: 11,
+                                                    ),
+                                                  ),
+                                                  keyboardType:
+                                                      TextInputType.number,
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter
+                                                        .digitsOnly,
+                                                  ],
+                                                  textInputAction:
+                                                      TextInputAction.next,
+                                                  onFieldSubmitted: (_) =>
+                                                      _focusNextPriceField(
+                                                        length,
+                                                      ),
+                                                  validator: (value) {
+                                                    if (value == null ||
+                                                        value.isEmpty) {
+                                                      return '가격을 입력해주세요';
+                                                    }
+                                                    final doubleValue =
+                                                        double.tryParse(value);
+                                                    if (doubleValue == null ||
+                                                        doubleValue < 0) {
+                                                      return '유효한 가격을 입력해주세요';
+                                                    }
+                                                    return null;
+                                                  },
+                                                  enabled: !_isLoading,
+                                                ),
+                                              ],
+                                            )
+                                          : Row(
+                                              children: [
+                                                // 칸수 라벨
+                                                Container(
+                                                  width: 80,
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 12,
+                                                        horizontal: 16,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.blue.shade50,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          8,
+                                                        ),
+                                                    border: Border.all(
+                                                      color:
+                                                          Colors.blue.shade200,
+                                                    ),
+                                                  ),
+                                                  child: Text(
+                                                    '$length칸',
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 14,
+                                                    ),
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+
+                                                // 가격 입력 필드
+                                                Expanded(
+                                                  child: TextFormField(
+                                                    controller:
+                                                        _priceControllers[length],
+                                                    focusNode:
+                                                        _priceFocusNodes[length],
+                                                    decoration: InputDecoration(
+                                                      labelText: '중고가',
+                                                      hintText: '가격 입력',
+                                                      border:
+                                                          const OutlineInputBorder(),
+                                                      prefixIcon: const Icon(
+                                                        Icons.attach_money,
+                                                        size: 20,
+                                                      ),
+                                                      suffixText: '원',
+                                                      isDense: true,
+                                                      errorStyle:
+                                                          const TextStyle(
+                                                            fontSize: 11,
+                                                          ),
+                                                    ),
+                                                    keyboardType:
+                                                        TextInputType.number,
+                                                    inputFormatters: [
+                                                      FilteringTextInputFormatter
+                                                          .digitsOnly,
+                                                    ],
+                                                    textInputAction:
+                                                        TextInputAction.next,
+                                                    onFieldSubmitted: (_) =>
+                                                        _focusNextPriceField(
+                                                          length,
+                                                        ),
+                                                    validator: (value) {
+                                                      if (value == null ||
+                                                          value.isEmpty) {
+                                                        return '가격을 입력해주세요';
+                                                      }
+                                                      final doubleValue =
+                                                          double.tryParse(
+                                                            value,
+                                                          );
+                                                      if (doubleValue == null ||
+                                                          doubleValue < 0) {
+                                                        return '유효한 가격을 입력해주세요';
+                                                      }
+                                                      return null;
+                                                    },
+                                                    enabled: !_isLoading,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                    );
+                                  }),
+
+                                  // 일괄 가격 설정 기능
+                                  const SizedBox(height: 16),
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.orange.shade200,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          '일괄 가격 설정',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        if (isMobileLayout)
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              TextFormField(
+                                                key: const ValueKey(
+                                                  'bulk_price',
+                                                ),
+                                                decoration:
+                                                    const InputDecoration(
+                                                      labelText:
+                                                          '모든 칸수에 적용할 가격',
+                                                      border:
+                                                          OutlineInputBorder(),
+                                                      suffixText: '원',
+                                                      isDense: true,
+                                                    ),
+                                                keyboardType:
+                                                    TextInputType.number,
+                                                inputFormatters: [
+                                                  FilteringTextInputFormatter
+                                                      .digitsOnly,
+                                                ],
+                                                onFieldSubmitted: (value) =>
+                                                    _applyBulkPrice(value),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              ElevatedButton(
+                                                onPressed: _showBulkPriceDialog,
+                                                child: const Text('적용'),
+                                              ),
+                                            ],
+                                          )
+                                        else
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: TextFormField(
+                                                  key: const ValueKey(
+                                                    'bulk_price',
+                                                  ),
+                                                  decoration:
+                                                      const InputDecoration(
+                                                        labelText:
+                                                            '모든 칸수에 적용할 가격',
+                                                        border:
+                                                            OutlineInputBorder(),
+                                                        suffixText: '원',
+                                                        isDense: true,
+                                                      ),
+                                                  keyboardType:
+                                                      TextInputType.number,
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter
+                                                        .digitsOnly,
+                                                  ],
+                                                  onFieldSubmitted: (value) =>
+                                                      _applyBulkPrice(value),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              ElevatedButton(
+                                                onPressed: _showBulkPriceDialog,
+                                                child: const Text('적용'),
+                                              ),
+                                            ],
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
+                          ),
+                        const SizedBox(height: 24),
+
+                        ElevatedButton(
+                          onPressed: _isLoading ? null : _saveFishingRod,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            backgroundColor: Theme.of(context).primaryColor,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  isEditing ? '수정 완료' : '낚시대 추가',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),

@@ -138,6 +138,8 @@ class AppDrawer extends ConsumerWidget {
         ),
         title: Text(
           title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: isSelected ? Theme.of(context).primaryColor : null,
             fontWeight: isSelected ? FontWeight.bold : null,
@@ -158,20 +160,22 @@ class AppDrawer extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('낚시대 계산기'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('버전: 1.0.0'),
-            SizedBox(height: 8),
-            Text('개발: Flutter + Riverpod'),
-            SizedBox(height: 8),
-            Text('기능:'),
-            Text('• 브랜드 관리'),
-            Text('• 낚시대 관리'),
-            Text('• 가격 계산 (매입율 적용)'),
-            Text('• Firestore 공용 데이터 저장'),
-          ],
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('버전: 1.0.0'),
+              SizedBox(height: 8),
+              Text('개발: Flutter + Riverpod'),
+              SizedBox(height: 8),
+              Text('기능:'),
+              Text('• 브랜드 관리'),
+              Text('• 낚시대 관리'),
+              Text('• 가격 계산 (매입율 적용)'),
+              Text('• Firestore 공용 데이터 저장'),
+            ],
+          ),
         ),
         actions: [
           TextButton(
