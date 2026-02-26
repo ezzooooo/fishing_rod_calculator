@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class AppDrawer extends StatelessWidget {
+import '../providers/auth_provider.dart';
+
+class AppDrawer extends ConsumerWidget {
   final String currentRoute;
 
   const AppDrawer({super.key, required this.currentRoute});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Drawer(
       child: Column(
         children: [
@@ -87,6 +90,14 @@ class AppDrawer extends StatelessWidget {
                     _showAppInfo(context);
                   },
                 ),
+                ListTile(
+                  leading: const Icon(Icons.logout),
+                  title: const Text('로그아웃'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await ref.read(authControllerProvider).signOut();
+                  },
+                ),
               ],
             ),
           ),
@@ -159,7 +170,7 @@ class AppDrawer extends StatelessWidget {
             Text('• 브랜드 관리'),
             Text('• 낚시대 관리'),
             Text('• 가격 계산 (매입율 적용)'),
-            Text('• 데이터 로컬 저장'),
+            Text('• Firestore 공용 데이터 저장'),
           ],
         ),
         actions: [

@@ -60,6 +60,11 @@ dependencies:
   pdf: ^3.10.7
   google_fonts: ^6.2.1
 
+  # Firebase
+  firebase_core: ^4.1.1
+  firebase_auth: ^6.0.3
+  cloud_firestore: ^6.0.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

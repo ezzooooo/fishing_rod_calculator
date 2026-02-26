@@ -1,9 +1,14 @@
 import 'dart:convert';
-import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:uuid/uuid.dart';
+
+import '../models/brand.dart';
+import '../models/fishing_rod.dart';
 import '../providers/brand_provider.dart';
 import '../providers/fishing_rod_provider.dart';
 import '../widgets/app_drawer.dart';
@@ -18,6 +23,86 @@ class SystemSettingsScreen extends ConsumerStatefulWidget {
 
 class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
   bool _isLoading = false;
+  final _uuid = const Uuid();
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value);
+    }
+    return null;
+  }
+
+  Future<String> _readPickedFileAsString(PlatformFile file) async {
+    if (file.bytes != null) {
+      return utf8.decode(file.bytes!);
+    }
+    return file.xFile.readAsString();
+  }
+
+  Future<void> _saveJsonFile({
+    required String dialogTitle,
+    required String fileName,
+    required String jsonString,
+    required void Function() onSuccess,
+  }) async {
+    final bytes = Uint8List.fromList(utf8.encode(jsonString));
+    final outputPath = await FilePicker.platform.saveFile(
+      dialogTitle: dialogTitle,
+      fileName: fileName,
+      type: FileType.custom,
+      allowedExtensions: const ['json'],
+      bytes: bytes,
+    );
+
+    // 웹은 브라우저가 다운로드를 처리해서 항상 null을 반환합니다.
+    if (kIsWeb || outputPath != null) {
+      onSuccess();
+    }
+  }
+
+  Brand _brandFromJsonMap(Map<String, dynamic> item) {
+    final idCandidate = item['id']?.toString().trim() ?? '';
+    final id = idCandidate.isEmpty ? _uuid.v4() : idCandidate;
+
+    return Brand(
+      id: id,
+      name: item['name']?.toString() ?? '',
+      createdAt: _parseDate(item['createdAt']),
+      updatedAt: _parseDate(item['updatedAt']),
+    );
+  }
+
+  FishingRod _fishingRodFromJsonMap(Map<String, dynamic> item) {
+    final idCandidate = item['id']?.toString().trim() ?? '';
+    final id = idCandidate.isEmpty ? _uuid.v4() : idCandidate;
+
+    final lengthPrices = <int, double>{};
+    final rawLengthPrices = item['lengthPrices'];
+    if (rawLengthPrices is Map) {
+      for (final entry in rawLengthPrices.entries) {
+        final length = int.tryParse(entry.key.toString());
+        final price = (entry.value as num?)?.toDouble();
+        if (length != null && price != null) {
+          lengthPrices[length] = price;
+        }
+      }
+    }
+
+    return FishingRod(
+      id: id,
+      name: item['name']?.toString() ?? '',
+      brandId: item['brandId']?.toString() ?? '',
+      minValue: (item['minValue'] as num?)?.toInt() ?? 18,
+      maxValue: (item['maxValue'] as num?)?.toInt() ?? 60,
+      usedPrice: (item['usedPrice'] as num?)?.toDouble() ?? 0.0,
+      lengthPrices: lengthPrices,
+      createdAt: _parseDate(item['createdAt']),
+      updatedAt: _parseDate(item['updatedAt']),
+    );
+  }
 
   Future<void> _loadDefaultFishingRods() async {
     setState(() => _isLoading = true);
@@ -27,35 +112,13 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
         'assets/fishing_rods.json',
       );
       final List<dynamic> jsonData = json.decode(jsonString);
-
-      // 기존 낚시대 모두 삭제
       final rodNotifier = ref.read(fishingRodProvider.notifier);
-      final currentRods = ref.read(fishingRodProvider);
-      for (final rod in currentRods) {
-        rodNotifier.deleteFishingRod(rod.id);
-      }
-
-      // 새 낚시대들 추가
-      for (final item in jsonData) {
-        // lengthPrices 처리 (null일 수 있음)
-        Map<int, double> lengthPrices = {};
-        if (item['lengthPrices'] != null && item['lengthPrices'].isNotEmpty) {
-          lengthPrices = Map<int, double>.from(
-            (item['lengthPrices'] as Map<String, dynamic>).map(
-              (k, v) => MapEntry(int.parse(k), (v as num).toDouble()),
-            ),
-          );
-        }
-
-        await rodNotifier.addFishingRod(
-          name: item['name'],
-          brandId: item['brandId'],
-          minValue: item['minValue'] ?? 18,
-          maxValue: item['maxValue'] ?? 60,
-          usedPrice: (item['usedPrice'] as num?)?.toDouble() ?? 0.0,
-          lengthPrices: lengthPrices,
-        );
-      }
+      final rods = jsonData
+          .map(
+            (item) => _fishingRodFromJsonMap(Map<String, dynamic>.from(item)),
+          )
+          .toList();
+      await rodNotifier.replaceFishingRods(rods);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -85,23 +148,15 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // assets에서 브랜드 데이터 로드
       final String jsonString = await rootBundle.loadString(
         'assets/brands.json',
       );
       final List<dynamic> jsonData = json.decode(jsonString);
-
-      // 기존 브랜드 모두 삭제
       final brandNotifier = ref.read(brandProvider.notifier);
-      final currentBrands = ref.read(brandProvider);
-      for (final brand in currentBrands) {
-        brandNotifier.deleteBrand(brand.id);
-      }
-
-      // 새 브랜드들 추가
-      for (final item in jsonData) {
-        brandNotifier.addBrandWithId(item['id'], item['name']);
-      }
+      final brands = jsonData
+          .map((item) => _brandFromJsonMap(Map<String, dynamic>.from(item)))
+          .toList();
+      await brandNotifier.replaceBrands(brands);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -157,26 +212,21 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
         '  ',
       ).convert(brandData);
 
-      // 파일 저장 위치 선택
-      String? outputFile = await FilePicker.platform.saveFile(
+      await _saveJsonFile(
         dialogTitle: '브랜드 데이터 저장',
         fileName: 'brands_${DateTime.now().millisecondsSinceEpoch}.json',
-        type: FileType.custom,
-        allowedExtensions: ['json'],
+        jsonString: jsonString,
+        onSuccess: () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('브랜드 ${brands.length}개를 저장했습니다.'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        },
       );
-
-      if (outputFile != null) {
-        await File(outputFile).writeAsString(jsonString);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('브랜드 ${brands.length}개를 저장했습니다.'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -199,24 +249,19 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
         type: FileType.custom,
         allowedExtensions: ['json'],
         dialogTitle: '브랜드 데이터 불러오기',
+        withData: true,
       );
 
       if (result != null) {
-        final file = File(result.files.single.path!);
-        final String jsonString = await file.readAsString();
+        final String jsonString = await _readPickedFileAsString(
+          result.files.single,
+        );
         final List<dynamic> jsonData = json.decode(jsonString);
-
-        // 기존 브랜드 모두 삭제
         final brandNotifier = ref.read(brandProvider.notifier);
-        final currentBrands = ref.read(brandProvider);
-        for (final brand in currentBrands) {
-          brandNotifier.deleteBrand(brand.id);
-        }
-
-        // 새 브랜드들 추가
-        for (final item in jsonData) {
-          brandNotifier.addBrand(item['name']);
-        }
+        final brands = jsonData
+            .map((item) => _brandFromJsonMap(Map<String, dynamic>.from(item)))
+            .toList();
+        await brandNotifier.replaceBrands(brands);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -282,26 +327,21 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
         '  ',
       ).convert(rodData);
 
-      // 파일 저장 위치 선택
-      String? outputFile = await FilePicker.platform.saveFile(
+      await _saveJsonFile(
         dialogTitle: '낚시대 데이터 저장',
         fileName: 'fishing_rods_${DateTime.now().millisecondsSinceEpoch}.json',
-        type: FileType.custom,
-        allowedExtensions: ['json'],
+        jsonString: jsonString,
+        onSuccess: () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('낚시대 ${fishingRods.length}개를 저장했습니다.'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        },
       );
-
-      if (outputFile != null) {
-        await File(outputFile).writeAsString(jsonString);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('낚시대 ${fishingRods.length}개를 저장했습니다.'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -324,41 +364,21 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
         type: FileType.custom,
         allowedExtensions: ['json'],
         dialogTitle: '낚시대 데이터 불러오기',
+        withData: true,
       );
 
       if (result != null) {
-        final file = File(result.files.single.path!);
-        final String jsonString = await file.readAsString();
+        final String jsonString = await _readPickedFileAsString(
+          result.files.single,
+        );
         final List<dynamic> jsonData = json.decode(jsonString);
-
-        // 기존 낚시대 모두 삭제
         final rodNotifier = ref.read(fishingRodProvider.notifier);
-        final currentRods = ref.read(fishingRodProvider);
-        for (final rod in currentRods) {
-          rodNotifier.deleteFishingRod(rod.id);
-        }
-
-        // 새 낚시대들 추가
-        for (final item in jsonData) {
-          // lengthPrices 처리 (null일 수 있음)
-          Map<int, double> lengthPrices = {};
-          if (item['lengthPrices'] != null) {
-            lengthPrices = Map<int, double>.from(
-              (item['lengthPrices'] as Map<String, dynamic>).map(
-                (k, v) => MapEntry(int.parse(k), (v as num).toDouble()),
-              ),
-            );
-          }
-
-          await rodNotifier.addFishingRod(
-            name: item['name'],
-            brandId: item['brandId'],
-            minValue: item['minValue'] ?? 18,
-            maxValue: item['maxValue'] ?? 60,
-            usedPrice: (item['usedPrice'] as num?)?.toDouble() ?? 0.0,
-            lengthPrices: lengthPrices,
-          );
-        }
+        final rods = jsonData
+            .map(
+              (item) => _fishingRodFromJsonMap(Map<String, dynamic>.from(item)),
+            )
+            .toList();
+        await rodNotifier.replaceFishingRods(rods);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

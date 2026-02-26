@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "251272354309",
+    "project_id": "frc-staff-juwon-20260226",
+    "storage_bucket": "frc-staff-juwon-20260226.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:251272354309:android:6defae0c4768a0c7249a6c",
+        "android_client_info": {
+          "package_name": "com.example.fishing_rod_calculator"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxbgbWLScjBLUTnmO5njPDUXMzokR0HmA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

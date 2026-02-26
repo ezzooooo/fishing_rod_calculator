@@ -1,33 +1,93 @@
-import 'dart:convert';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
-import '../models/fishing_rod.dart';
+import 'dart:async';
 
-const String _fishingRodsKey = 'fishing_rods';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+
+import '../models/fishing_rod.dart';
+import 'auth_provider.dart';
+
 const _uuid = Uuid();
 
 class FishingRodNotifier extends StateNotifier<List<FishingRod>> {
-  FishingRodNotifier() : super([]) {
-    _loadFishingRods();
-  }
+  FishingRodNotifier(this._firestore) : super([]);
 
-  Future<void> _loadFishingRods() async {
-    final prefs = await SharedPreferences.getInstance();
-    final fishingRodsJson = prefs.getString(_fishingRodsKey);
+  final FirebaseFirestore _firestore;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subscription;
+  SessionStatus _sessionStatus = SessionStatus.loading;
 
-    if (fishingRodsJson != null) {
-      final List<dynamic> fishingRodsList = jsonDecode(fishingRodsJson);
-      state = fishingRodsList.map((json) => FishingRod.fromJson(json)).toList();
+  CollectionReference<Map<String, dynamic>> get _rodsCollection =>
+      _firestore.collection('fishing_rods');
+
+  void handleSessionStatus(SessionStatus status) {
+    if (_sessionStatus == status) {
+      return;
+    }
+
+    _sessionStatus = status;
+    if (status == SessionStatus.authorized) {
+      _startListening();
+    } else {
+      _stopListening();
+      state = [];
     }
   }
 
-  Future<void> _saveFishingRods() async {
-    final prefs = await SharedPreferences.getInstance();
-    final fishingRodsJson = jsonEncode(
-      state.map((rod) => rod.toJson()).toList(),
+  void _startListening() {
+    _stopListening();
+
+    _subscription = _rodsCollection.snapshots().listen(
+      (snapshot) {
+        final rods = snapshot.docs.map(_rodFromDoc).toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
+        state = rods;
+      },
+      onError: (error, stackTrace) {
+        state = [];
+      },
     );
-    await prefs.setString(_fishingRodsKey, fishingRodsJson);
+  }
+
+  FishingRod _rodFromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = Map<String, dynamic>.from(doc.data());
+    data['id'] = doc.id;
+    _normalizeDateField(data, 'createdAt');
+    _normalizeDateField(data, 'updatedAt');
+    return FishingRod.fromJson(data);
+  }
+
+  void _normalizeDateField(Map<String, dynamic> data, String key) {
+    final value = data[key];
+    if (value is Timestamp) {
+      data[key] = value.toDate().toIso8601String();
+    }
+  }
+
+  void _stopListening() {
+    _subscription?.cancel();
+    _subscription = null;
+  }
+
+  Future<void> _ensureAuthorized() async {
+    if (_sessionStatus != SessionStatus.authorized) {
+      throw StateError('로그인된 직원만 데이터를 변경할 수 있습니다.');
+    }
+  }
+
+  Future<void> _commitBatchOperations(
+    List<void Function(WriteBatch batch)> operations,
+  ) async {
+    const maxBatchSize = 400;
+    for (var i = 0; i < operations.length; i += maxBatchSize) {
+      final batch = _firestore.batch();
+      final end = (i + maxBatchSize > operations.length)
+          ? operations.length
+          : i + maxBatchSize;
+      for (var j = i; j < end; j++) {
+        operations[j](batch);
+      }
+      await batch.commit();
+    }
   }
 
   Future<void> addFishingRod({
@@ -38,6 +98,8 @@ class FishingRodNotifier extends StateNotifier<List<FishingRod>> {
     required double usedPrice,
     Map<int, double>? lengthPrices,
   }) async {
+    await _ensureAuthorized();
+
     final newFishingRod = FishingRod(
       id: _uuid.v4(),
       name: name,
@@ -48,9 +110,53 @@ class FishingRodNotifier extends StateNotifier<List<FishingRod>> {
       lengthPrices: lengthPrices ?? {},
       createdAt: DateTime.now(),
     );
+    await _rodsCollection.doc(newFishingRod.id).set(newFishingRod.toJson());
+  }
 
-    state = [...state, newFishingRod];
-    await _saveFishingRods();
+  Future<void> addFishingRodWithId({
+    required String id,
+    required String name,
+    required String brandId,
+    required int minValue,
+    required int maxValue,
+    required double usedPrice,
+    Map<int, double>? lengthPrices,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) async {
+    await _ensureAuthorized();
+
+    final fishingRod = FishingRod(
+      id: id,
+      name: name,
+      brandId: brandId,
+      minValue: minValue,
+      maxValue: maxValue,
+      usedPrice: usedPrice,
+      lengthPrices: lengthPrices ?? {},
+      createdAt: createdAt ?? DateTime.now(),
+      updatedAt: updatedAt,
+    );
+    await _rodsCollection.doc(id).set(fishingRod.toJson());
+  }
+
+  Future<void> replaceFishingRods(List<FishingRod> fishingRods) async {
+    await _ensureAuthorized();
+
+    final existing = await _rodsCollection.get();
+    final operations = <void Function(WriteBatch batch)>[];
+
+    for (final doc in existing.docs) {
+      operations.add((batch) => batch.delete(doc.reference));
+    }
+
+    for (final rod in fishingRods) {
+      operations.add(
+        (batch) => batch.set(_rodsCollection.doc(rod.id), rod.toJson()),
+      );
+    }
+
+    await _commitBatchOperations(operations);
   }
 
   Future<void> updateFishingRod({
@@ -62,27 +168,28 @@ class FishingRodNotifier extends StateNotifier<List<FishingRod>> {
     required double usedPrice,
     Map<int, double>? lengthPrices,
   }) async {
-    state = state.map((rod) {
-      if (rod.id == id) {
-        return rod.copyWith(
-          name: name,
-          brandId: brandId,
-          minValue: minValue,
-          maxValue: maxValue,
-          usedPrice: usedPrice,
-          lengthPrices: lengthPrices ?? rod.lengthPrices,
-          updatedAt: DateTime.now(),
-        );
-      }
-      return rod;
-    }).toList();
+    await _ensureAuthorized();
 
-    await _saveFishingRods();
+    final existing = getFishingRodById(id);
+    if (existing == null) {
+      return;
+    }
+
+    final updatedRod = existing.copyWith(
+      name: name,
+      brandId: brandId,
+      minValue: minValue,
+      maxValue: maxValue,
+      usedPrice: usedPrice,
+      lengthPrices: lengthPrices ?? existing.lengthPrices,
+      updatedAt: DateTime.now(),
+    );
+    await _rodsCollection.doc(id).set(updatedRod.toJson());
   }
 
   Future<void> deleteFishingRod(String id) async {
-    state = state.where((rod) => rod.id != id).toList();
-    await _saveFishingRods();
+    await _ensureAuthorized();
+    await _rodsCollection.doc(id).delete();
   }
 
   FishingRod? getFishingRodById(String id) {
@@ -105,11 +212,24 @@ class FishingRodNotifier extends StateNotifier<List<FishingRod>> {
       return rod.name.toLowerCase().contains(lowercaseQuery);
     }).toList();
   }
+
+  @override
+  void dispose() {
+    _stopListening();
+    super.dispose();
+  }
 }
 
 final fishingRodProvider =
     StateNotifierProvider<FishingRodNotifier, List<FishingRod>>((ref) {
-      return FishingRodNotifier();
+      final notifier = FishingRodNotifier(ref.watch(firebaseFirestoreProvider));
+      notifier.handleSessionStatus(ref.read(sessionStatusProvider));
+
+      ref.listen<SessionStatus>(sessionStatusProvider, (_, next) {
+        notifier.handleSessionStatus(next);
+      });
+
+      return notifier;
     });
 
 // 낚시대를 ID로 찾는 프로바이더

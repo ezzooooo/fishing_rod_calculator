@@ -1,17 +1,86 @@
-# fishing_rod_calculator
+# 낚시대 계산기 (웹/직원용)
 
-A new Flutter project.
+Flutter 기반 낚시대 계산기입니다.
 
-## Getting Started
+- 인증: Firebase Auth (이메일/비밀번호)
+- 데이터: Cloud Firestore (직원 공용 데이터)
+- 배포: Cloudflare Pages
 
-This project is a starting point for a Flutter application.
+## 핵심 동작
 
-A few resources to get you started if this is your first Flutter project:
+- 모든 직원이 같은 브랜드/낚시대 데이터를 공유합니다.
+- 로그인한 계정이라도 `staff/{uid}.enabled == true` 인 경우만 접근 허용됩니다.
+- 소셜 로그인은 사용하지 않습니다.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Firestore 컬렉션 구조
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-# fishing_rod_calculator
+- `staff/{uid}`
+  - `enabled: true` 이어야 앱 접근 허용
+- `brands/{brandId}`
+- `fishing_rods/{rodId}`
+
+## 1) Firebase 설정
+
+### 기본 설정
+
+```bash
+flutter pub get
+flutterfire configure \
+  --project=frc-staff-juwon-20260226 \
+  --platforms=android,ios,macos,web,windows \
+  --yes
+```
+
+`flutterfire configure`가 아래 파일을 생성/갱신합니다.
+
+- `lib/firebase_options.dart`
+- `android/app/google-services.json`
+- `ios/Runner/GoogleService-Info.plist`
+- `macos/Runner/GoogleService-Info.plist`
+
+### Firebase Console 설정
+
+1. Authentication -> Sign-in method -> Email/Password 활성화
+2. Firestore Database 생성 (Production mode 권장)
+3. 보안 규칙 배포
+
+```bash
+firebase deploy --only firestore:rules --project frc-staff-juwon-20260226
+```
+
+### 직원 계정 준비
+
+1. Authentication에서 직원 이메일/비밀번호 계정 생성
+2. 계정 `uid` 확인
+3. Firestore `staff/{uid}` 문서 생성 후 `enabled: true` 저장
+
+## 2) 로컬 실행
+
+```bash
+flutter run -d chrome
+```
+
+## 3) Cloudflare Pages 배포
+
+### 빌드
+
+```bash
+flutter build web --release
+```
+
+### 배포
+
+```bash
+npx wrangler whoami
+npx wrangler pages deploy build/web --project-name <your-pages-project>
+```
+
+- `wrangler.toml`에 `pages_build_output_dir = "build/web"` 설정됨
+- SPA 라우팅용 `web/_redirects` 포함
+
+## 개발 검증
+
+```bash
+flutter analyze
+flutter test
+```

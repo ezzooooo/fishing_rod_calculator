@@ -1372,364 +1372,540 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  static const int _printPreviewSplitThreshold = 14;
+
+  String _formatDateTime(DateTime dateTime) {
+    return DateFormat('yyyy-MM-dd HH:mm:ss').format(dateTime);
+  }
+
+  Widget _buildPrintPreviewInfoChip(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.blue.shade100),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(fontSize: 12, color: Colors.black87),
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrintPreviewInfoCard({
+    required FishingRod selectedRod,
+    required String brandName,
+    required int dataRowCount,
+    required String lengthRangeText,
+    required int totalQuantity,
+    required double totalFinalPrice,
+    required DateTime generatedAt,
+    required bool isSplitLayout,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.blue.shade100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '인쇄 미리보기',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              _buildPrintPreviewInfoChip('브랜드', brandName),
+              _buildPrintPreviewInfoChip('낚시대', selectedRod.name),
+              _buildPrintPreviewInfoChip('칸수 범위', lengthRangeText),
+              _buildPrintPreviewInfoChip('데이터 행', '$dataRowCount행'),
+              _buildPrintPreviewInfoChip('총 수량', '$totalQuantity대'),
+              _buildPrintPreviewInfoChip(
+                '총 최종 매입가',
+                '${_numberFormat.format(totalFinalPrice.toInt())}원',
+              ),
+              _buildPrintPreviewInfoChip('생성일시', _formatDateTime(generatedAt)),
+              if (isSplitLayout)
+                _buildPrintPreviewInfoChip('레이아웃', '14행 초과로 좌/우 분할'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  DataCell _buildPrintPreviewCell(
+    String text, {
+    required double fontSize,
+    EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 8),
+    FontWeight fontWeight = FontWeight.normal,
+    Color? color,
+  }) {
+    return DataCell(
+      Container(
+        padding: padding,
+        alignment: Alignment.centerRight,
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: fontWeight,
+            color: color,
+          ),
+        ),
+      ),
+    );
+  }
+
+  DataRow _buildPrintPreviewDataRow(
+    CalculationItem calculation,
+    FishingRod selectedRod, {
+    required double bodyFontSize,
+    required double emphasizedFontSize,
+    required EdgeInsetsGeometry cellPadding,
+  }) {
+    final rodPrice = selectedRod.getPriceForLength(calculation.length);
+    final originalPrice = calculation.getTotalPrice(rodPrice);
+    final finalPrice = calculation.getFinalPrice(rodPrice);
+
+    return DataRow(
+      cells: [
+        _buildPrintPreviewCell(
+          '${calculation.length}칸',
+          fontSize: bodyFontSize,
+          padding: cellPadding,
+          fontWeight: FontWeight.w600,
+        ),
+        _buildPrintPreviewCell(
+          '${calculation.quantity}대',
+          fontSize: bodyFontSize,
+          padding: cellPadding,
+          fontWeight: FontWeight.w600,
+        ),
+        _buildPrintPreviewCell(
+          '${_numberFormat.format(rodPrice.toInt())}원',
+          fontSize: bodyFontSize,
+          padding: cellPadding,
+        ),
+        _buildPrintPreviewCell(
+          '${_numberFormat.format(originalPrice.toInt())}원',
+          fontSize: bodyFontSize,
+          padding: cellPadding,
+          fontWeight: FontWeight.bold,
+        ),
+        _buildPrintPreviewCell(
+          '${(calculation.discountRate * 100).toInt()}%',
+          fontSize: bodyFontSize,
+          padding: cellPadding,
+        ),
+        _buildPrintPreviewCell(
+          '${_numberFormat.format(finalPrice.toInt())}원',
+          fontSize: emphasizedFontSize,
+          padding: cellPadding,
+          fontWeight: FontWeight.bold,
+          color: Colors.blue.shade700,
+        ),
+      ],
+    );
+  }
+
+  DataRow _buildPrintPreviewTotalRow({
+    required int totalQuantity,
+    required double totalOriginalPrice,
+    required double totalFinalPrice,
+    required double bodyFontSize,
+    required double emphasizedFontSize,
+    required EdgeInsetsGeometry cellPadding,
+  }) {
+    return DataRow(
+      color: WidgetStateProperty.all(Colors.blue.shade100),
+      cells: [
+        _buildPrintPreviewCell(
+          '총계',
+          fontSize: bodyFontSize,
+          padding: cellPadding,
+          fontWeight: FontWeight.bold,
+        ),
+        _buildPrintPreviewCell(
+          '$totalQuantity대',
+          fontSize: bodyFontSize,
+          padding: cellPadding,
+          fontWeight: FontWeight.bold,
+        ),
+        _buildPrintPreviewCell(
+          '-',
+          fontSize: bodyFontSize,
+          padding: cellPadding,
+        ),
+        _buildPrintPreviewCell(
+          '${_numberFormat.format(totalOriginalPrice.toInt())}원',
+          fontSize: bodyFontSize,
+          padding: cellPadding,
+          fontWeight: FontWeight.bold,
+        ),
+        _buildPrintPreviewCell(
+          '-',
+          fontSize: bodyFontSize,
+          padding: cellPadding,
+        ),
+        _buildPrintPreviewCell(
+          '${_numberFormat.format(totalFinalPrice.toInt())}원',
+          fontSize: emphasizedFontSize,
+          padding: cellPadding,
+          fontWeight: FontWeight.bold,
+          color: Colors.blue.shade700,
+        ),
+      ],
+    );
+  }
+
+  List<DataColumn> _buildPrintPreviewColumns(double headerFontSize) {
+    final headerStyle = TextStyle(
+      fontWeight: FontWeight.bold,
+      fontSize: headerFontSize,
+    );
+
+    return [
+      DataColumn(
+        label: Expanded(
+          child: Text('칸수', textAlign: TextAlign.center, style: headerStyle),
+        ),
+      ),
+      DataColumn(
+        label: Expanded(
+          child: Text('수량', textAlign: TextAlign.center, style: headerStyle),
+        ),
+      ),
+      DataColumn(
+        label: Expanded(
+          child: Text('중고가', textAlign: TextAlign.center, style: headerStyle),
+        ),
+      ),
+      DataColumn(
+        label: Expanded(
+          child: Text(
+            '총 평균거래가',
+            textAlign: TextAlign.center,
+            style: headerStyle,
+          ),
+        ),
+      ),
+      DataColumn(
+        label: Expanded(
+          child: Text('매입율', textAlign: TextAlign.center, style: headerStyle),
+        ),
+      ),
+      DataColumn(
+        label: Expanded(
+          child: Text(
+            '최종 매입가',
+            textAlign: TextAlign.center,
+            style: headerStyle.copyWith(color: Colors.blue.shade700),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  Widget _buildPrintPreviewTable({
+    required List<CalculationItem> calculations,
+    required FishingRod selectedRod,
+    required int totalQuantity,
+    required double totalOriginalPrice,
+    required double totalFinalPrice,
+    required bool includeTotalRow,
+    required bool compact,
+  }) {
+    final headerFontSize = compact ? 12.0 : 15.0;
+    final bodyFontSize = compact ? 12.0 : 15.0;
+    final emphasizedFontSize = compact ? 13.0 : 17.0;
+    final headingRowHeight = compact ? 48.0 : 55.0;
+    final dataRowHeight = compact ? 40.0 : 45.0;
+    final columnSpacing = compact ? 10.0 : 16.0;
+    final horizontalMargin = compact ? 8.0 : 12.0;
+    final cellPadding = EdgeInsets.symmetric(horizontal: compact ? 4 : 8);
+
+    return DataTable(
+      columnSpacing: columnSpacing,
+      horizontalMargin: horizontalMargin,
+      headingRowHeight: headingRowHeight,
+      dataRowMinHeight: dataRowHeight,
+      dataRowMaxHeight: dataRowHeight,
+      border: TableBorder.all(color: Colors.grey.shade300, width: 1),
+      headingRowColor: WidgetStateProperty.all(Colors.blue.shade50),
+      columns: _buildPrintPreviewColumns(headerFontSize),
+      rows: [
+        ...calculations.map(
+          (calculation) => _buildPrintPreviewDataRow(
+            calculation,
+            selectedRod,
+            bodyFontSize: bodyFontSize,
+            emphasizedFontSize: emphasizedFontSize,
+            cellPadding: cellPadding,
+          ),
+        ),
+        if (includeTotalRow)
+          _buildPrintPreviewTotalRow(
+            totalQuantity: totalQuantity,
+            totalOriginalPrice: totalOriginalPrice,
+            totalFinalPrice: totalFinalPrice,
+            bodyFontSize: bodyFontSize,
+            emphasizedFontSize: emphasizedFontSize,
+            cellPadding: cellPadding,
+          ),
+      ],
+    );
+  }
+
   void _showPrintDialog() {
+    final selectedRod = _selectedRod;
+    if (selectedRod == null) {
+      return;
+    }
+
     final calculations = ref.read(calculationProvider);
     final currentCalculations =
-        calculations.where((c) => c.fishingRodId == _selectedRod!.id).toList()
+        calculations.where((c) => c.fishingRodId == selectedRod.id).toList()
           ..sort((a, b) => a.length.compareTo(b.length));
+    final brands = ref.read(brandProvider);
+    final brand = brands.firstWhere(
+      (item) => item.id == selectedRod.brandId,
+      orElse: () => const Brand(id: '', name: '알 수 없음'),
+    );
 
-    final totalOriginalPrice = ref.read(totalOriginalPriceProvider);
-    final totalFinalPrice = ref.read(totalFinalPriceProvider);
-    final totalQuantity = ref.read(totalQuantityProvider);
+    int totalQuantity = 0;
+    double totalOriginalPrice = 0;
+    double totalFinalPrice = 0;
+    for (final calculation in currentCalculations) {
+      final rodPrice = selectedRod.getPriceForLength(calculation.length);
+      totalQuantity += calculation.quantity;
+      totalOriginalPrice += calculation.getTotalPrice(rodPrice);
+      totalFinalPrice += calculation.getFinalPrice(rodPrice);
+    }
+
+    final generatedAt = DateTime.now();
+    final isSplitLayout =
+        currentCalculations.length > _printPreviewSplitThreshold;
+    final isCompactLayout =
+        currentCalculations.length > _printPreviewSplitThreshold * 2;
+    final splitIndex = (currentCalculations.length / 2).ceil();
+    final leftCalculations = isSplitLayout
+        ? currentCalculations.sublist(0, splitIndex)
+        : currentCalculations;
+    final rightCalculations = isSplitLayout
+        ? currentCalculations.sublist(splitIndex)
+        : const <CalculationItem>[];
+
+    final String lengthRangeText;
+    if (currentCalculations.isEmpty) {
+      lengthRangeText = '-';
+    } else {
+      final minLength = currentCalculations.first.length;
+      final maxLength = currentCalculations.last.length;
+      lengthRangeText = minLength == maxLength
+          ? '$minLength칸'
+          : '$minLength칸 ~ $maxLength칸';
+    }
 
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.white,
-        child: Container(
-          width: 900,
-          height: 1000,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              // 데이터 테이블
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(8),
-                  child: Column(
-                    children: [
-                      DataTable(
-                        columnSpacing: 16,
-                        horizontalMargin: 12,
-                        headingRowHeight: 55,
-                        dataRowMinHeight: 45,
-                        dataRowMaxHeight: 45,
-                        border: TableBorder.all(
-                          color: Colors.grey.shade300,
-                          width: 1,
-                        ),
-                        headingRowColor: WidgetStateProperty.all(
-                          Colors.blue.shade50,
-                        ),
-                        columns: const [
-                          DataColumn(
-                            label: Expanded(
-                              child: Text(
-                                '칸수',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                          ),
-                          DataColumn(
-                            label: Expanded(
-                              child: Text(
-                                '수량',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                          ),
-                          DataColumn(
-                            label: Expanded(
-                              child: Text(
-                                '중고가',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                          ),
-                          DataColumn(
-                            label: Expanded(
-                              child: Text(
-                                '총 평균거래가',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                          ),
-                          DataColumn(
-                            label: Expanded(
-                              child: Text(
-                                '매입율',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                          ),
-                          DataColumn(
-                            label: Expanded(
-                              child: Text(
-                                '최종 매입가',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: Colors.blue,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                        rows: [
-                          // 데이터 행들
-                          ...currentCalculations.map((calculation) {
-                            final rodPrice = _selectedRod!.getPriceForLength(
-                              calculation.length,
-                            );
-                            final originalPrice = calculation.getTotalPrice(
-                              rodPrice,
-                            );
-                            final finalPrice = calculation.getFinalPrice(
-                              rodPrice,
-                            );
+      builder: (dialogContext) {
+        final screenSize = MediaQuery.of(dialogContext).size;
+        final dialogWidth = (screenSize.width * 0.94)
+            .clamp(900.0, 1500.0)
+            .toDouble();
+        final dialogHeight = (screenSize.height * 0.92)
+            .clamp(720.0, 1040.0)
+            .toDouble();
 
-                            return DataRow(
-                              cells: [
-                                DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    alignment: Alignment.centerRight,
-                                    child: Text(
-                                      '${calculation.length}칸',
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
+        return Dialog(
+          backgroundColor: Colors.white,
+          insetPadding: const EdgeInsets.all(24),
+          child: SizedBox(
+            width: dialogWidth,
+            height: dialogHeight,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _buildPrintPreviewInfoCard(
+                    selectedRod: selectedRod,
+                    brandName: brand.name,
+                    dataRowCount: currentCalculations.length,
+                    lengthRangeText: lengthRangeText,
+                    totalQuantity: totalQuantity,
+                    totalFinalPrice: totalFinalPrice,
+                    generatedAt: generatedAt,
+                    isSplitLayout: isSplitLayout,
+                  ),
+                  const SizedBox(height: 12),
+
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        children: [
+                          if (isSplitLayout)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: _buildPrintPreviewTable(
+                                    calculations: leftCalculations,
+                                    selectedRod: selectedRod,
+                                    totalQuantity: totalQuantity,
+                                    totalOriginalPrice: totalOriginalPrice,
+                                    totalFinalPrice: totalFinalPrice,
+                                    includeTotalRow: false,
+                                    compact: isCompactLayout,
                                   ),
                                 ),
-                                DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    alignment: Alignment.centerRight,
-                                    child: Text(
-                                      '${calculation.quantity}대',
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    alignment: Alignment.centerRight,
-                                    child: Text(
-                                      '${_numberFormat.format(rodPrice.toInt())}원',
-                                      style: const TextStyle(fontSize: 15),
-                                    ),
-                                  ),
-                                ),
-                                DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    alignment: Alignment.centerRight,
-                                    child: Text(
-                                      '${_numberFormat.format(originalPrice.toInt())}원',
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    alignment: Alignment.centerRight,
-                                    child: Text(
-                                      '${(calculation.discountRate * 100).toInt()}%',
-                                      style: const TextStyle(fontSize: 15),
-                                    ),
-                                  ),
-                                ),
-                                DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    alignment: Alignment.centerRight,
-                                    child: Text(
-                                      '${_numberFormat.format(finalPrice.toInt())}원',
-                                      style: const TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.blue,
-                                      ),
-                                    ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildPrintPreviewTable(
+                                    calculations: rightCalculations,
+                                    selectedRod: selectedRod,
+                                    totalQuantity: totalQuantity,
+                                    totalOriginalPrice: totalOriginalPrice,
+                                    totalFinalPrice: totalFinalPrice,
+                                    includeTotalRow: false,
+                                    compact: isCompactLayout,
                                   ),
                                 ),
                               ],
-                            );
-                          }),
-
-                          // 총계 행
-                          DataRow(
-                            color: WidgetStateProperty.all(
-                              Colors.blue.shade100,
+                            )
+                          else
+                            _buildPrintPreviewTable(
+                              calculations: currentCalculations,
+                              selectedRod: selectedRod,
+                              totalQuantity: totalQuantity,
+                              totalOriginalPrice: totalOriginalPrice,
+                              totalFinalPrice: totalFinalPrice,
+                              includeTotalRow: true,
+                              compact: false,
                             ),
-                            cells: [
-                              DataCell(
-                                Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8),
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
+                          if (isSplitLayout) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Wrap(
+                                spacing: 24,
+                                runSpacing: 8,
+                                children: [
+                                  const Text(
                                     '총계',
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ),
-                              ),
-                              DataCell(
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    '$totalQuantity대',
+                                  Text(
+                                    '총 수량: $totalQuantity대',
                                     style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    '총 평균거래가: ${_numberFormat.format(totalOriginalPrice.toInt())}원',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    '총 최종 매입가: ${_numberFormat.format(totalFinalPrice.toInt())}원',
+                                    style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.bold,
+                                      color: Colors.blue.shade700,
                                     ),
                                   ),
-                                ),
+                                ],
                               ),
-                              DataCell(
-                                Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8),
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    '-',
-                                    style: TextStyle(fontSize: 15),
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    '${_numberFormat.format(totalOriginalPrice.toInt())}원',
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8),
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    '-',
-                                    style: TextStyle(fontSize: 15),
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    '${_numberFormat.format(totalFinalPrice.toInt())}원',
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isSplitLayout
+                            ? '14행 초과로 좌/우 분할 표시 중'
+                            : '생성일시: ${_formatDateTime(generatedAt)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              try {
+                                final pdf = await _generatePdf();
+                                await Printing.layoutPdf(
+                                  onLayout: (PdfPageFormat format) async =>
+                                      pdf.save(),
+                                );
+                              } catch (e) {
+                                if (dialogContext.mounted) {
+                                  ScaffoldMessenger.of(
+                                    dialogContext,
+                                  ).showSnackBar(
+                                    SnackBar(content: Text('인쇄 오류: $e')),
+                                  );
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.print),
+                            label: const Text('인쇄'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(dialogContext),
+                            child: const Text('닫기'),
                           ),
                         ],
                       ),
                     ],
                   ),
-                ),
-              ),
-
-              // 하단 버튼들
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '생성일시: ${DateTime.now().toString().substring(0, 19)}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                  Row(
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          try {
-                            final pdf = await _generatePdf();
-                            await Printing.layoutPdf(
-                              onLayout: (PdfPageFormat format) async =>
-                                  pdf.save(),
-                            );
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('인쇄 오류: $e')),
-                              );
-                            }
-                          }
-                        },
-                        icon: const Icon(Icons.print),
-                        label: const Text('인쇄'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('닫기'),
-                      ),
-                    ],
-                  ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

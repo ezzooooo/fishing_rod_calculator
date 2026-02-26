@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isStaff() {
+      return isSignedIn() &&
+          exists(/databases/$(database)/documents/staff/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.enabled == true;
+    }
+
+    // 직원 권한 확인용 문서. 본인 문서만 읽기 허용.
+    match /staff/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /brands/{brandId} {
+      allow read, write: if isStaff();
+    }
+
+    match /fishing_rods/{rodId} {
+      allow read, write: if isStaff();
+    }
+  }
+}

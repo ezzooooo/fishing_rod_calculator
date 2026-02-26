@@ -1,16 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'firebase/firebase_bootstrap.dart';
 import 'routes/app_router.dart';
 
-void main() {
-  runApp(const ProviderScope(child: FishingRodCalculatorApp()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final bootstrapResult = await FirebaseBootstrap.initialize();
+
+  runApp(
+    ProviderScope(
+      child: FishingRodCalculatorApp(
+        firebaseReady: bootstrapResult.isReady,
+        firebaseErrorMessage: bootstrapResult.errorMessage,
+      ),
+    ),
+  );
 }
 
-class FishingRodCalculatorApp extends StatelessWidget {
-  const FishingRodCalculatorApp({super.key});
+class FishingRodCalculatorApp extends ConsumerWidget {
+  const FishingRodCalculatorApp({
+    super.key,
+    this.firebaseReady = true,
+    this.firebaseErrorMessage,
+  });
+
+  final bool firebaseReady;
+  final String? firebaseErrorMessage;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!firebaseReady) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: '낚시대 계산기',
+        home: _FirebaseSetupScreen(errorMessage: firebaseErrorMessage),
+      );
+    }
+
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: '낚시대 계산기',
@@ -99,7 +126,59 @@ class FishingRodCalculatorApp extends StatelessWidget {
           ), // 기본 14 → 16, 색상 명시
         ),
       ),
-      routerConfig: appRouter,
+      routerConfig: ref.watch(appRouterProvider),
+    );
+  }
+}
+
+class _FirebaseSetupScreen extends StatelessWidget {
+  const _FirebaseSetupScreen({this.errorMessage});
+
+  final String? errorMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: Card(
+            margin: const EdgeInsets.all(24),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Firebase 설정 필요',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Firebase 설정 파일이 필요합니다. 프로젝트 루트에서 '
+                    '`flutterfire configure`를 실행해 주세요.',
+                  ),
+                  const SizedBox(height: 12),
+                  const SelectableText(
+                    '필수 확인 항목:\n'
+                    '- lib/firebase_options.dart 생성\n'
+                    '- Android/iOS/macOS 설정 파일 생성\n'
+                    '- Firebase Authentication(이메일/비밀번호) 활성화',
+                  ),
+                  if (errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      errorMessage!,
+                      style: TextStyle(color: Colors.red.shade700),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
