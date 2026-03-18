@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum SessionStatus { loading, signedOut, unauthorized, authorized }
 
+const systemSettingsAdminUid = 'dQtjIk9jVyg347foJj1mqcznI2x2';
+
 final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
   return FirebaseAuth.instance;
 });
@@ -55,6 +57,11 @@ final sessionStatusProvider = Provider<SessionStatus>((ref) {
 
 final currentUserProvider = Provider<User?>((ref) {
   return ref.watch(authStateChangesProvider).valueOrNull;
+});
+
+final canAccessSystemSettingsProvider = Provider<bool>((ref) {
+  final user = ref.watch(currentUserProvider);
+  return user?.uid == systemSettingsAdminUid;
 });
 
 class AuthController {

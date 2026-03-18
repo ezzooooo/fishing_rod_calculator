@@ -174,6 +174,22 @@ class _FishingRodManagementScreenState
                         (b) => b.id == rod.brandId,
                         orElse: () => const Brand(id: '', name: '알 수 없음'),
                       );
+                      final purchasePrices = rod.purchaseLengthPrices.isNotEmpty
+                          ? rod.purchaseLengthPrices.values
+                          : (rod.lengthPrices.isNotEmpty
+                                ? rod.lengthPrices.values
+                                : [rod.usedPrice]);
+                      final salePrices = rod.saleLengthPrices.isNotEmpty
+                          ? rod.saleLengthPrices.values
+                          : (rod.lengthPrices.isNotEmpty
+                                ? rod.lengthPrices.values
+                                : [rod.usedPrice]);
+                      final averagePurchasePrice =
+                          purchasePrices.reduce((a, b) => a + b) /
+                          purchasePrices.length;
+                      final averageSalePrice =
+                          salePrices.reduce((a, b) => a + b) /
+                          salePrices.length;
 
                       return Card(
                         child: ListTile(
@@ -191,7 +207,12 @@ class _FishingRodManagementScreenState
                             children: [
                               Text('브랜드: ${brand.name}'),
                               Text('범위: ${rod.minValue}~${rod.maxValue}'),
-                              Text('중고가: ${rod.usedPrice.toStringAsFixed(0)}원'),
+                              Text(
+                                '평균 매입가: ${averagePurchasePrice.toStringAsFixed(0)}원',
+                              ),
+                              Text(
+                                '평균 판매가: ${averageSalePrice.toStringAsFixed(0)}원',
+                              ),
                             ],
                           ),
                           trailing: isMobileLayout

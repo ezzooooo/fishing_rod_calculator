@@ -19,6 +19,16 @@ _$FishingRodImpl _$$FishingRodImplFromJson(Map<String, dynamic> json) =>
             (k, e) => MapEntry(int.parse(k), (e as num).toDouble()),
           ) ??
           const {},
+      purchaseLengthPrices:
+          (json['purchaseLengthPrices'] as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry(int.parse(k), (e as num).toDouble()),
+          ) ??
+          const {},
+      saleLengthPrices:
+          (json['saleLengthPrices'] as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry(int.parse(k), (e as num).toDouble()),
+          ) ??
+          const {},
       createdAt: json['createdAt'] == null
           ? null
           : DateTime.parse(json['createdAt'] as String),
@@ -36,6 +46,12 @@ Map<String, dynamic> _$$FishingRodImplToJson(_$FishingRodImpl instance) =>
       'maxValue': instance.maxValue,
       'usedPrice': instance.usedPrice,
       'lengthPrices': instance.lengthPrices.map(
+        (k, e) => MapEntry(k.toString(), e),
+      ),
+      'purchaseLengthPrices': instance.purchaseLengthPrices.map(
+        (k, e) => MapEntry(k.toString(), e),
+      ),
+      'saleLengthPrices': instance.saleLengthPrices.map(
         (k, e) => MapEntry(k.toString(), e),
       ),
       'createdAt': instance.createdAt?.toIso8601String(),

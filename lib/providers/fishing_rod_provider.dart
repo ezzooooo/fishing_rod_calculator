@@ -97,8 +97,14 @@ class FishingRodNotifier extends StateNotifier<List<FishingRod>> {
     required int maxValue,
     required double usedPrice,
     Map<int, double>? lengthPrices,
+    Map<int, double>? purchaseLengthPrices,
+    Map<int, double>? saleLengthPrices,
   }) async {
     await _ensureAuthorized();
+
+    final resolvedSaleLengthPrices = saleLengthPrices ?? lengthPrices ?? {};
+    final resolvedPurchaseLengthPrices =
+        purchaseLengthPrices ?? lengthPrices ?? {};
 
     final newFishingRod = FishingRod(
       id: _uuid.v4(),
@@ -107,7 +113,9 @@ class FishingRodNotifier extends StateNotifier<List<FishingRod>> {
       minValue: minValue,
       maxValue: maxValue,
       usedPrice: usedPrice,
-      lengthPrices: lengthPrices ?? {},
+      lengthPrices: resolvedSaleLengthPrices,
+      purchaseLengthPrices: resolvedPurchaseLengthPrices,
+      saleLengthPrices: resolvedSaleLengthPrices,
       createdAt: DateTime.now(),
     );
     await _rodsCollection.doc(newFishingRod.id).set(newFishingRod.toJson());
@@ -121,10 +129,16 @@ class FishingRodNotifier extends StateNotifier<List<FishingRod>> {
     required int maxValue,
     required double usedPrice,
     Map<int, double>? lengthPrices,
+    Map<int, double>? purchaseLengthPrices,
+    Map<int, double>? saleLengthPrices,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) async {
     await _ensureAuthorized();
+
+    final resolvedSaleLengthPrices = saleLengthPrices ?? lengthPrices ?? {};
+    final resolvedPurchaseLengthPrices =
+        purchaseLengthPrices ?? lengthPrices ?? {};
 
     final fishingRod = FishingRod(
       id: id,
@@ -133,7 +147,9 @@ class FishingRodNotifier extends StateNotifier<List<FishingRod>> {
       minValue: minValue,
       maxValue: maxValue,
       usedPrice: usedPrice,
-      lengthPrices: lengthPrices ?? {},
+      lengthPrices: resolvedSaleLengthPrices,
+      purchaseLengthPrices: resolvedPurchaseLengthPrices,
+      saleLengthPrices: resolvedSaleLengthPrices,
       createdAt: createdAt ?? DateTime.now(),
       updatedAt: updatedAt,
     );
@@ -167,6 +183,8 @@ class FishingRodNotifier extends StateNotifier<List<FishingRod>> {
     required int maxValue,
     required double usedPrice,
     Map<int, double>? lengthPrices,
+    Map<int, double>? purchaseLengthPrices,
+    Map<int, double>? saleLengthPrices,
   }) async {
     await _ensureAuthorized();
 
@@ -175,13 +193,20 @@ class FishingRodNotifier extends StateNotifier<List<FishingRod>> {
       return;
     }
 
+    final resolvedSaleLengthPrices =
+        saleLengthPrices ?? lengthPrices ?? existing.saleLengthPrices;
+    final resolvedPurchaseLengthPrices =
+        purchaseLengthPrices ?? lengthPrices ?? existing.purchaseLengthPrices;
+
     final updatedRod = existing.copyWith(
       name: name,
       brandId: brandId,
       minValue: minValue,
       maxValue: maxValue,
       usedPrice: usedPrice,
-      lengthPrices: lengthPrices ?? existing.lengthPrices,
+      lengthPrices: resolvedSaleLengthPrices,
+      purchaseLengthPrices: resolvedPurchaseLengthPrices,
+      saleLengthPrices: resolvedSaleLengthPrices,
       updatedAt: DateTime.now(),
     );
     await _rodsCollection.doc(id).set(updatedRod.toJson());

@@ -26,9 +26,13 @@ mixin _$FishingRod {
   String get brandId => throw _privateConstructorUsedError;
   int get minValue => throw _privateConstructorUsedError;
   int get maxValue => throw _privateConstructorUsedError;
-  double get usedPrice => throw _privateConstructorUsedError;
+  double get usedPrice => throw _privateConstructorUsedError; // 레거시 판매가 평균값
   Map<int, double> get lengthPrices =>
-      throw _privateConstructorUsedError; // 칸수별 가격 {길이: 가격}
+      throw _privateConstructorUsedError; // 레거시 칸수별 판매가
+  Map<int, double> get purchaseLengthPrices =>
+      throw _privateConstructorUsedError; // 칸수별 매입가
+  Map<int, double> get saleLengthPrices =>
+      throw _privateConstructorUsedError; // 칸수별 판매가
   DateTime? get createdAt => throw _privateConstructorUsedError;
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
@@ -57,6 +61,8 @@ abstract class $FishingRodCopyWith<$Res> {
     int maxValue,
     double usedPrice,
     Map<int, double> lengthPrices,
+    Map<int, double> purchaseLengthPrices,
+    Map<int, double> saleLengthPrices,
     DateTime? createdAt,
     DateTime? updatedAt,
   });
@@ -84,6 +90,8 @@ class _$FishingRodCopyWithImpl<$Res, $Val extends FishingRod>
     Object? maxValue = null,
     Object? usedPrice = null,
     Object? lengthPrices = null,
+    Object? purchaseLengthPrices = null,
+    Object? saleLengthPrices = null,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
@@ -117,6 +125,14 @@ class _$FishingRodCopyWithImpl<$Res, $Val extends FishingRod>
                 ? _value.lengthPrices
                 : lengthPrices // ignore: cast_nullable_to_non_nullable
                       as Map<int, double>,
+            purchaseLengthPrices: null == purchaseLengthPrices
+                ? _value.purchaseLengthPrices
+                : purchaseLengthPrices // ignore: cast_nullable_to_non_nullable
+                      as Map<int, double>,
+            saleLengthPrices: null == saleLengthPrices
+                ? _value.saleLengthPrices
+                : saleLengthPrices // ignore: cast_nullable_to_non_nullable
+                      as Map<int, double>,
             createdAt: freezed == createdAt
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
@@ -148,6 +164,8 @@ abstract class _$$FishingRodImplCopyWith<$Res>
     int maxValue,
     double usedPrice,
     Map<int, double> lengthPrices,
+    Map<int, double> purchaseLengthPrices,
+    Map<int, double> saleLengthPrices,
     DateTime? createdAt,
     DateTime? updatedAt,
   });
@@ -174,6 +192,8 @@ class __$$FishingRodImplCopyWithImpl<$Res>
     Object? maxValue = null,
     Object? usedPrice = null,
     Object? lengthPrices = null,
+    Object? purchaseLengthPrices = null,
+    Object? saleLengthPrices = null,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
@@ -207,6 +227,14 @@ class __$$FishingRodImplCopyWithImpl<$Res>
             ? _value._lengthPrices
             : lengthPrices // ignore: cast_nullable_to_non_nullable
                   as Map<int, double>,
+        purchaseLengthPrices: null == purchaseLengthPrices
+            ? _value._purchaseLengthPrices
+            : purchaseLengthPrices // ignore: cast_nullable_to_non_nullable
+                  as Map<int, double>,
+        saleLengthPrices: null == saleLengthPrices
+            ? _value._saleLengthPrices
+            : saleLengthPrices // ignore: cast_nullable_to_non_nullable
+                  as Map<int, double>,
         createdAt: freezed == createdAt
             ? _value.createdAt
             : createdAt // ignore: cast_nullable_to_non_nullable
@@ -231,9 +259,13 @@ class _$FishingRodImpl extends _FishingRod {
     required this.maxValue,
     required this.usedPrice,
     final Map<int, double> lengthPrices = const {},
+    final Map<int, double> purchaseLengthPrices = const {},
+    final Map<int, double> saleLengthPrices = const {},
     this.createdAt,
     this.updatedAt,
   }) : _lengthPrices = lengthPrices,
+       _purchaseLengthPrices = purchaseLengthPrices,
+       _saleLengthPrices = saleLengthPrices,
        super._();
 
   factory _$FishingRodImpl.fromJson(Map<String, dynamic> json) =>
@@ -251,7 +283,9 @@ class _$FishingRodImpl extends _FishingRod {
   final int maxValue;
   @override
   final double usedPrice;
+  // 레거시 판매가 평균값
   final Map<int, double> _lengthPrices;
+  // 레거시 판매가 평균값
   @override
   @JsonKey()
   Map<int, double> get lengthPrices {
@@ -260,7 +294,30 @@ class _$FishingRodImpl extends _FishingRod {
     return EqualUnmodifiableMapView(_lengthPrices);
   }
 
-  // 칸수별 가격 {길이: 가격}
+  // 레거시 칸수별 판매가
+  final Map<int, double> _purchaseLengthPrices;
+  // 레거시 칸수별 판매가
+  @override
+  @JsonKey()
+  Map<int, double> get purchaseLengthPrices {
+    if (_purchaseLengthPrices is EqualUnmodifiableMapView)
+      return _purchaseLengthPrices;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(_purchaseLengthPrices);
+  }
+
+  // 칸수별 매입가
+  final Map<int, double> _saleLengthPrices;
+  // 칸수별 매입가
+  @override
+  @JsonKey()
+  Map<int, double> get saleLengthPrices {
+    if (_saleLengthPrices is EqualUnmodifiableMapView) return _saleLengthPrices;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(_saleLengthPrices);
+  }
+
+  // 칸수별 판매가
   @override
   final DateTime? createdAt;
   @override
@@ -268,7 +325,7 @@ class _$FishingRodImpl extends _FishingRod {
 
   @override
   String toString() {
-    return 'FishingRod(id: $id, name: $name, brandId: $brandId, minValue: $minValue, maxValue: $maxValue, usedPrice: $usedPrice, lengthPrices: $lengthPrices, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'FishingRod(id: $id, name: $name, brandId: $brandId, minValue: $minValue, maxValue: $maxValue, usedPrice: $usedPrice, lengthPrices: $lengthPrices, purchaseLengthPrices: $purchaseLengthPrices, saleLengthPrices: $saleLengthPrices, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -289,6 +346,14 @@ class _$FishingRodImpl extends _FishingRod {
               other._lengthPrices,
               _lengthPrices,
             ) &&
+            const DeepCollectionEquality().equals(
+              other._purchaseLengthPrices,
+              _purchaseLengthPrices,
+            ) &&
+            const DeepCollectionEquality().equals(
+              other._saleLengthPrices,
+              _saleLengthPrices,
+            ) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -306,6 +371,8 @@ class _$FishingRodImpl extends _FishingRod {
     maxValue,
     usedPrice,
     const DeepCollectionEquality().hash(_lengthPrices),
+    const DeepCollectionEquality().hash(_purchaseLengthPrices),
+    const DeepCollectionEquality().hash(_saleLengthPrices),
     createdAt,
     updatedAt,
   );
@@ -333,6 +400,8 @@ abstract class _FishingRod extends FishingRod {
     required final int maxValue,
     required final double usedPrice,
     final Map<int, double> lengthPrices,
+    final Map<int, double> purchaseLengthPrices,
+    final Map<int, double> saleLengthPrices,
     final DateTime? createdAt,
     final DateTime? updatedAt,
   }) = _$FishingRodImpl;
@@ -352,9 +421,13 @@ abstract class _FishingRod extends FishingRod {
   @override
   int get maxValue;
   @override
-  double get usedPrice;
+  double get usedPrice; // 레거시 판매가 평균값
   @override
-  Map<int, double> get lengthPrices; // 칸수별 가격 {길이: 가격}
+  Map<int, double> get lengthPrices; // 레거시 칸수별 판매가
+  @override
+  Map<int, double> get purchaseLengthPrices; // 칸수별 매입가
+  @override
+  Map<int, double> get saleLengthPrices; // 칸수별 판매가
   @override
   DateTime? get createdAt;
   @override

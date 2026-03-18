@@ -40,7 +40,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         case SessionStatus.unauthorized:
           return isAccessDenied ? null : '/access-denied';
         case SessionStatus.authorized:
+          final canAccessSystemSettings = ref.read(
+            canAccessSystemSettingsProvider,
+          );
           if (isLogin || isAccessDenied || isAuthLoading) {
+            return '/';
+          }
+          if (location == '/system-settings' && !canAccessSystemSettings) {
             return '/';
           }
           return null;

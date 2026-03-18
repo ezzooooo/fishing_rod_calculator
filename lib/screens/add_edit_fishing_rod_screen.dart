@@ -8,6 +8,8 @@ import '../providers/brand_provider.dart';
 import '../widgets/app_drawer.dart';
 import '../models/fishing_rod.dart';
 
+enum PriceType { purchase, sale }
+
 class AddEditFishingRodScreen extends ConsumerStatefulWidget {
   final String? fishingRodId;
 
@@ -33,8 +35,10 @@ class _AddEditFishingRodScreenState
 
   // 칸수 선택 관련
   Set<int> _selectedLengths = <int>{};
-  final Map<int, TextEditingController> _priceControllers = {};
-  final Map<int, FocusNode> _priceFocusNodes = {};
+  final Map<int, TextEditingController> _purchasePriceControllers = {};
+  final Map<int, TextEditingController> _salePriceControllers = {};
+  final Map<int, FocusNode> _purchasePriceFocusNodes = {};
+  final Map<int, FocusNode> _salePriceFocusNodes = {};
 
   // 칸수 설정 모드
   bool _isLengthSettingMode = false;
@@ -60,15 +64,57 @@ class _AddEditFishingRodScreenState
       // 기존 낚시대의 칸수들을 선택된 상태로 설정
       _selectedLengths = rod.availableLengths.toSet();
 
-      // 각 칸수에 대해 개별 가격으로 초기화 (없으면 기본 가격 사용)
+      // 각 칸수에 대해 매입가/판매가를 초기화합니다.
       for (int length in _selectedLengths) {
-        final price = rod.getPriceForLength(length);
-        _priceControllers[length] = TextEditingController(
-          text: price.toStringAsFixed(0),
+        _initializeLengthInputs(
+          length,
+          purchasePriceText: rod
+              .getPurchasePriceForLength(length)
+              .toStringAsFixed(0),
+          salePriceText: rod.getSalePriceForLength(length).toStringAsFixed(0),
         );
-        _priceFocusNodes[length] = FocusNode();
       }
     }
+  }
+
+  Map<int, TextEditingController> _controllersFor(PriceType type) {
+    return type == PriceType.purchase
+        ? _purchasePriceControllers
+        : _salePriceControllers;
+  }
+
+  Map<int, FocusNode> _focusNodesFor(PriceType type) {
+    return type == PriceType.purchase
+        ? _purchasePriceFocusNodes
+        : _salePriceFocusNodes;
+  }
+
+  String _labelFor(PriceType type) {
+    return type == PriceType.purchase ? '매입가' : '판매가';
+  }
+
+  void _initializeLengthInputs(
+    int length, {
+    String purchasePriceText = '',
+    String salePriceText = '',
+  }) {
+    _purchasePriceControllers[length] = TextEditingController(
+      text: purchasePriceText,
+    );
+    _salePriceControllers[length] = TextEditingController(text: salePriceText);
+    _purchasePriceFocusNodes[length] = FocusNode();
+    _salePriceFocusNodes[length] = FocusNode();
+  }
+
+  void _disposeLengthInputs(int length) {
+    _purchasePriceControllers[length]?.dispose();
+    _salePriceControllers[length]?.dispose();
+    _purchasePriceFocusNodes[length]?.dispose();
+    _salePriceFocusNodes[length]?.dispose();
+    _purchasePriceControllers.remove(length);
+    _salePriceControllers.remove(length);
+    _purchasePriceFocusNodes.remove(length);
+    _salePriceFocusNodes.remove(length);
   }
 
   @override
@@ -78,10 +124,16 @@ class _AddEditFishingRodScreenState
     _maxValueController.dispose();
 
     // 가격 컨트롤러들과 포커스 노드들 정리
-    for (var controller in _priceControllers.values) {
+    for (var controller in _purchasePriceControllers.values) {
       controller.dispose();
     }
-    for (var focusNode in _priceFocusNodes.values) {
+    for (var controller in _salePriceControllers.values) {
+      controller.dispose();
+    }
+    for (var focusNode in _purchasePriceFocusNodes.values) {
+      focusNode.dispose();
+    }
+    for (var focusNode in _salePriceFocusNodes.values) {
       focusNode.dispose();
     }
 
@@ -580,8 +632,8 @@ class _AddEditFishingRodScreenState
                                   const SizedBox(height: 8),
                                   Text(
                                     isMobileLayout
-                                        ? '각 칸수별로 중고가를 입력하세요.'
-                                        : '각 칸수별로 중고가를 입력하세요. Tab 키로 다음 필드로 이동할 수 있습니다.',
+                                        ? '각 칸수별로 매입가와 판매가를 입력하세요.'
+                                        : '각 칸수별로 매입가와 판매가를 입력하세요. Tab 키로 다음 필드로 이동할 수 있습니다.',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey.shade600,
@@ -597,175 +649,10 @@ class _AddEditFishingRodScreenState
                                       padding: const EdgeInsets.only(
                                         bottom: 12.0,
                                       ),
-                                      child: isMobileLayout
-                                          ? Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        vertical: 8,
-                                                        horizontal: 12,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.blue.shade50,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          8,
-                                                        ),
-                                                    border: Border.all(
-                                                      color:
-                                                          Colors.blue.shade200,
-                                                    ),
-                                                  ),
-                                                  child: Text(
-                                                    '$length칸',
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 8),
-                                                TextFormField(
-                                                  controller:
-                                                      _priceControllers[length],
-                                                  focusNode:
-                                                      _priceFocusNodes[length],
-                                                  decoration: InputDecoration(
-                                                    labelText: '중고가',
-                                                    hintText: '가격 입력',
-                                                    border:
-                                                        const OutlineInputBorder(),
-                                                    prefixIcon: const Icon(
-                                                      Icons.attach_money,
-                                                      size: 20,
-                                                    ),
-                                                    suffixText: '원',
-                                                    isDense: true,
-                                                    errorStyle: const TextStyle(
-                                                      fontSize: 11,
-                                                    ),
-                                                  ),
-                                                  keyboardType:
-                                                      TextInputType.number,
-                                                  inputFormatters: [
-                                                    FilteringTextInputFormatter
-                                                        .digitsOnly,
-                                                  ],
-                                                  textInputAction:
-                                                      TextInputAction.next,
-                                                  onFieldSubmitted: (_) =>
-                                                      _focusNextPriceField(
-                                                        length,
-                                                      ),
-                                                  validator: (value) {
-                                                    if (value == null ||
-                                                        value.isEmpty) {
-                                                      return '가격을 입력해주세요';
-                                                    }
-                                                    final doubleValue =
-                                                        double.tryParse(value);
-                                                    if (doubleValue == null ||
-                                                        doubleValue < 0) {
-                                                      return '유효한 가격을 입력해주세요';
-                                                    }
-                                                    return null;
-                                                  },
-                                                  enabled: !_isLoading,
-                                                ),
-                                              ],
-                                            )
-                                          : Row(
-                                              children: [
-                                                // 칸수 라벨
-                                                Container(
-                                                  width: 80,
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        vertical: 12,
-                                                        horizontal: 16,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.blue.shade50,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          8,
-                                                        ),
-                                                    border: Border.all(
-                                                      color:
-                                                          Colors.blue.shade200,
-                                                    ),
-                                                  ),
-                                                  child: Text(
-                                                    '$length칸',
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 14,
-                                                    ),
-                                                    textAlign: TextAlign.center,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 12),
-
-                                                // 가격 입력 필드
-                                                Expanded(
-                                                  child: TextFormField(
-                                                    controller:
-                                                        _priceControllers[length],
-                                                    focusNode:
-                                                        _priceFocusNodes[length],
-                                                    decoration: InputDecoration(
-                                                      labelText: '중고가',
-                                                      hintText: '가격 입력',
-                                                      border:
-                                                          const OutlineInputBorder(),
-                                                      prefixIcon: const Icon(
-                                                        Icons.attach_money,
-                                                        size: 20,
-                                                      ),
-                                                      suffixText: '원',
-                                                      isDense: true,
-                                                      errorStyle:
-                                                          const TextStyle(
-                                                            fontSize: 11,
-                                                          ),
-                                                    ),
-                                                    keyboardType:
-                                                        TextInputType.number,
-                                                    inputFormatters: [
-                                                      FilteringTextInputFormatter
-                                                          .digitsOnly,
-                                                    ],
-                                                    textInputAction:
-                                                        TextInputAction.next,
-                                                    onFieldSubmitted: (_) =>
-                                                        _focusNextPriceField(
-                                                          length,
-                                                        ),
-                                                    validator: (value) {
-                                                      if (value == null ||
-                                                          value.isEmpty) {
-                                                        return '가격을 입력해주세요';
-                                                      }
-                                                      final doubleValue =
-                                                          double.tryParse(
-                                                            value,
-                                                          );
-                                                      if (doubleValue == null ||
-                                                          doubleValue < 0) {
-                                                        return '유효한 가격을 입력해주세요';
-                                                      }
-                                                      return null;
-                                                    },
-                                                    enabled: !_isLoading,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
+                                      child: _buildLengthPriceInputs(
+                                        length,
+                                        isMobileLayout,
+                                      ),
                                     );
                                   }),
 
@@ -791,37 +678,37 @@ class _AddEditFishingRodScreenState
                                           ),
                                         ),
                                         const SizedBox(height: 8),
+                                        Text(
+                                          '선택된 ${_selectedLengths.length}개 칸수에 동일한 가격을 적용할 수 있습니다.',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
                                         if (isMobileLayout)
                                           Column(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.stretch,
                                             children: [
-                                              TextFormField(
-                                                key: const ValueKey(
-                                                  'bulk_price',
-                                                ),
-                                                decoration:
-                                                    const InputDecoration(
-                                                      labelText:
-                                                          '모든 칸수에 적용할 가격',
-                                                      border:
-                                                          OutlineInputBorder(),
-                                                      suffixText: '원',
-                                                      isDense: true,
-                                                    ),
-                                                keyboardType:
-                                                    TextInputType.number,
-                                                inputFormatters: [
-                                                  FilteringTextInputFormatter
-                                                      .digitsOnly,
-                                                ],
-                                                onFieldSubmitted: (value) =>
-                                                    _applyBulkPrice(value),
+                                              ElevatedButton(
+                                                onPressed: _isLoading
+                                                    ? null
+                                                    : () =>
+                                                          _showBulkPriceDialog(
+                                                            PriceType.purchase,
+                                                          ),
+                                                child: const Text('매입가 일괄 설정'),
                                               ),
                                               const SizedBox(height: 8),
                                               ElevatedButton(
-                                                onPressed: _showBulkPriceDialog,
-                                                child: const Text('적용'),
+                                                onPressed: _isLoading
+                                                    ? null
+                                                    : () =>
+                                                          _showBulkPriceDialog(
+                                                            PriceType.sale,
+                                                          ),
+                                                child: const Text('판매가 일괄 설정'),
                                               ),
                                             ],
                                           )
@@ -829,33 +716,32 @@ class _AddEditFishingRodScreenState
                                           Row(
                                             children: [
                                               Expanded(
-                                                child: TextFormField(
-                                                  key: const ValueKey(
-                                                    'bulk_price',
+                                                child: ElevatedButton(
+                                                  onPressed: _isLoading
+                                                      ? null
+                                                      : () =>
+                                                            _showBulkPriceDialog(
+                                                              PriceType
+                                                                  .purchase,
+                                                            ),
+                                                  child: const Text(
+                                                    '매입가 일괄 설정',
                                                   ),
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        labelText:
-                                                            '모든 칸수에 적용할 가격',
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                        suffixText: '원',
-                                                        isDense: true,
-                                                      ),
-                                                  keyboardType:
-                                                      TextInputType.number,
-                                                  inputFormatters: [
-                                                    FilteringTextInputFormatter
-                                                        .digitsOnly,
-                                                  ],
-                                                  onFieldSubmitted: (value) =>
-                                                      _applyBulkPrice(value),
                                                 ),
                                               ),
                                               const SizedBox(width: 8),
-                                              ElevatedButton(
-                                                onPressed: _showBulkPriceDialog,
-                                                child: const Text('적용'),
+                                              Expanded(
+                                                child: ElevatedButton(
+                                                  onPressed: _isLoading
+                                                      ? null
+                                                      : () =>
+                                                            _showBulkPriceDialog(
+                                                              PriceType.sale,
+                                                            ),
+                                                  child: const Text(
+                                                    '판매가 일괄 설정',
+                                                  ),
+                                                ),
                                               ),
                                             ],
                                           ),
@@ -903,6 +789,110 @@ class _AddEditFishingRodScreenState
     );
   }
 
+  Widget _buildPriceInputField({required int length, required PriceType type}) {
+    final controllers = _controllersFor(type);
+    final focusNodes = _focusNodesFor(type);
+
+    return TextFormField(
+      controller: controllers[length],
+      focusNode: focusNodes[length],
+      decoration: InputDecoration(
+        labelText: _labelFor(type),
+        hintText: '가격 입력',
+        border: const OutlineInputBorder(),
+        prefixIcon: const Icon(Icons.attach_money, size: 20),
+        suffixText: '원',
+        isDense: true,
+        errorStyle: const TextStyle(fontSize: 11),
+      ),
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      textInputAction: TextInputAction.next,
+      onFieldSubmitted: (_) => _focusNextPriceField(length, type),
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return '${_labelFor(type)}를 입력해주세요';
+        }
+        final doubleValue = double.tryParse(value);
+        if (doubleValue == null || doubleValue < 0) {
+          return '유효한 ${_labelFor(type)}를 입력해주세요';
+        }
+        return null;
+      },
+      enabled: !_isLoading,
+    );
+  }
+
+  Widget _buildLengthPriceInputs(int length, bool isMobileLayout) {
+    if (isMobileLayout) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Text(
+              '$length칸',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildPriceInputField(
+                  length: length,
+                  type: PriceType.purchase,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildPriceInputField(
+                  length: length,
+                  type: PriceType.sale,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Container(
+          width: 80,
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.blue.shade200),
+          ),
+          child: Text(
+            '$length칸',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildPriceInputField(
+            length: length,
+            type: PriceType.purchase,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildPriceInputField(length: length, type: PriceType.sale),
+        ),
+      ],
+    );
+  }
+
   void _clearAllInputs() {
     showDialog(
       context: context,
@@ -918,12 +908,9 @@ class _AddEditFishingRodScreenState
             onPressed: () {
               setState(() {
                 // 선택된 칸수들을 모두 해제
-                for (int length in _selectedLengths) {
-                  _priceControllers[length]?.dispose();
-                  _priceFocusNodes[length]?.dispose();
+                for (final length in _selectedLengths.toList()) {
+                  _disposeLengthInputs(length);
                 }
-                _priceControllers.clear();
-                _priceFocusNodes.clear();
                 _selectedLengths.clear();
 
                 // 범위 설정 값도 초기화
@@ -970,18 +957,14 @@ class _AddEditFishingRodScreenState
 
     // 새로 추가된 칸수들에 대해 컨트롤러와 포커스 노드 생성
     for (int length in newSelectedLengths) {
-      if (!_priceControllers.containsKey(length)) {
-        _priceControllers[length] = TextEditingController();
-        _priceFocusNodes[length] = FocusNode();
+      if (!_selectedLengths.contains(length)) {
+        _initializeLengthInputs(length);
       }
     }
 
     // 제거된 칸수들의 컨트롤러와 포커스 노드 정리
     for (int length in _selectedLengths.difference(newSelectedLengths)) {
-      _priceControllers[length]?.dispose();
-      _priceFocusNodes[length]?.dispose();
-      _priceControllers.remove(length);
-      _priceFocusNodes.remove(length);
+      _disposeLengthInputs(length);
     }
 
     setState(() {
@@ -994,52 +977,54 @@ class _AddEditFishingRodScreenState
     setState(() {
       if (_selectedLengths.contains(length)) {
         _selectedLengths.remove(length);
-        _priceControllers[length]?.dispose();
-        _priceFocusNodes[length]?.dispose();
-        _priceControllers.remove(length);
-        _priceFocusNodes.remove(length);
+        _disposeLengthInputs(length);
       } else {
         _selectedLengths.add(length);
-        _priceControllers[length] = TextEditingController();
-        _priceFocusNodes[length] = FocusNode();
+        _initializeLengthInputs(length);
       }
     });
   }
 
-  void _focusNextPriceField(int currentLength) {
+  void _focusNextPriceField(int currentLength, PriceType type) {
+    if (type == PriceType.purchase) {
+      _salePriceFocusNodes[currentLength]?.requestFocus();
+      return;
+    }
+
     final sortedLengths = _selectedLengths.toList()..sort();
     final currentIndex = sortedLengths.indexOf(currentLength);
 
     if (currentIndex < sortedLengths.length - 1) {
       final nextLength = sortedLengths[currentIndex + 1];
-      _priceFocusNodes[nextLength]?.requestFocus();
+      _purchasePriceFocusNodes[nextLength]?.requestFocus();
     } else {
       // 마지막 필드에서는 포커스 해제
       FocusScope.of(context).unfocus();
     }
   }
 
-  void _applyBulkPrice(String priceText) {
+  void _applyBulkPrice(PriceType type, String priceText) {
     if (priceText.isNotEmpty) {
       final price = double.tryParse(priceText);
       if (price != null && price >= 0) {
+        final controllers = _controllersFor(type);
         setState(() {
-          for (var controller in _priceControllers.values) {
+          for (var controller in controllers.values) {
             controller.text = priceText;
           }
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '모든 칸수에 ${_numberFormat.format(price.toInt())}원이 적용되었습니다',
+              '모든 칸수의 ${_labelFor(type)}에 ${_numberFormat.format(price.toInt())}원이 적용되었습니다',
             ),
             backgroundColor: Colors.green,
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('올바른 가격을 입력해주세요'),
+          SnackBar(
+            content: Text('올바른 ${_labelFor(type)}를 입력해주세요'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1047,25 +1032,25 @@ class _AddEditFishingRodScreenState
     }
   }
 
-  void _showBulkPriceDialog() {
+  void _showBulkPriceDialog(PriceType type) {
     final bulkPriceController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('일괄 가격 설정'),
+        title: Text('${_labelFor(type)} 일괄 설정'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '선택된 ${_selectedLengths.length}개 칸수에 모두 같은 가격을 적용합니다.',
+              '선택된 ${_selectedLengths.length}개 칸수에 모두 같은 ${_labelFor(type)}를 적용합니다.',
               style: TextStyle(color: Colors.grey.shade600),
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: bulkPriceController,
-              decoration: const InputDecoration(
-                labelText: '적용할 가격',
+              decoration: InputDecoration(
+                labelText: '적용할 ${_labelFor(type)}',
                 border: OutlineInputBorder(),
                 suffixText: '원',
               ),
@@ -1082,7 +1067,7 @@ class _AddEditFishingRodScreenState
           ),
           TextButton(
             onPressed: () {
-              _applyBulkPrice(bulkPriceController.text);
+              _applyBulkPrice(type, bulkPriceController.text);
               Navigator.pop(context);
             },
             child: const Text('적용'),
@@ -1109,27 +1094,29 @@ class _AddEditFishingRodScreenState
       return;
     }
 
-    // 모든 선택된 칸수에 대해 가격이 입력되었는지 확인
+    // 모든 선택된 칸수에 대해 매입가/판매가가 입력되었는지 확인
     for (int length in _selectedLengths) {
-      final priceText = _priceControllers[length]?.text ?? '';
-      if (priceText.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$length칸의 가격을 입력해주세요'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-      final price = double.tryParse(priceText);
-      if (price == null || price < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$length칸의 가격이 올바르지 않습니다'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
+      for (final type in PriceType.values) {
+        final priceText = _controllersFor(type)[length]?.text ?? '';
+        if (priceText.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$length칸의 ${_labelFor(type)}를 입력해주세요'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+        final price = double.tryParse(priceText);
+        if (price == null || price < 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$length칸의 ${_labelFor(type)}가 올바르지 않습니다'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
       }
     }
 
@@ -1146,17 +1133,21 @@ class _AddEditFishingRodScreenState
       final minValue = sortedLengths.isNotEmpty ? sortedLengths.first : 18;
       final maxValue = sortedLengths.isNotEmpty ? sortedLengths.last : 60;
 
-      // 칸수별 가격 맵 생성
-      final lengthPrices = <int, double>{};
+      final purchaseLengthPrices = <int, double>{};
+      final saleLengthPrices = <int, double>{};
       for (int length in _selectedLengths) {
-        final priceText = _priceControllers[length]?.text ?? '';
-        lengthPrices[length] = double.parse(priceText);
+        purchaseLengthPrices[length] = double.parse(
+          _purchasePriceControllers[length]?.text ?? '0',
+        );
+        saleLengthPrices[length] = double.parse(
+          _salePriceControllers[length]?.text ?? '0',
+        );
       }
 
-      // 하위 호환성을 위한 평균 가격 계산
-      final averagePrice = lengthPrices.values.isNotEmpty
-          ? lengthPrices.values.reduce((a, b) => a + b) /
-                lengthPrices.values.length
+      // 하위 호환성을 위해 판매가 평균을 레거시 필드에 유지합니다.
+      final averageSalePrice = saleLengthPrices.values.isNotEmpty
+          ? saleLengthPrices.values.reduce((a, b) => a + b) /
+                saleLengthPrices.values.length
           : 0.0;
 
       if (isEditing) {
@@ -1168,8 +1159,10 @@ class _AddEditFishingRodScreenState
               brandId: brandId,
               minValue: minValue,
               maxValue: maxValue,
-              usedPrice: averagePrice,
-              lengthPrices: lengthPrices,
+              usedPrice: averageSalePrice,
+              lengthPrices: saleLengthPrices,
+              purchaseLengthPrices: purchaseLengthPrices,
+              saleLengthPrices: saleLengthPrices,
             );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1187,8 +1180,10 @@ class _AddEditFishingRodScreenState
               brandId: brandId,
               minValue: minValue,
               maxValue: maxValue,
-              usedPrice: averagePrice,
-              lengthPrices: lengthPrices,
+              usedPrice: averageSalePrice,
+              lengthPrices: saleLengthPrices,
+              purchaseLengthPrices: purchaseLengthPrices,
+              saleLengthPrices: saleLengthPrices,
             );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

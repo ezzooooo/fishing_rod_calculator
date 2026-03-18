@@ -11,6 +11,8 @@ class AppDrawer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final canAccessSystemSettings = ref.watch(canAccessSystemSettingsProvider);
+
     return Drawer(
       child: Column(
         children: [
@@ -61,14 +63,16 @@ class AppDrawer extends ConsumerWidget {
                   isSelected: currentRoute.startsWith('/fishing-rods'),
                 ),
                 const Divider(),
-                _buildDrawerItem(
-                  context: context,
-                  icon: Icons.settings,
-                  title: '시스템 설정',
-                  route: '/system-settings',
-                  isSelected: currentRoute.startsWith('/system-settings'),
-                ),
-                const Divider(),
+                if (canAccessSystemSettings) ...[
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.settings,
+                    title: '시스템 설정',
+                    route: '/system-settings',
+                    isSelected: currentRoute.startsWith('/system-settings'),
+                  ),
+                  const Divider(),
+                ],
 
                 // 정보 섹션
                 const Padding(
@@ -172,7 +176,7 @@ class AppDrawer extends ConsumerWidget {
               Text('기능:'),
               Text('• 브랜드 관리'),
               Text('• 낚시대 관리'),
-              Text('• 가격 계산 (매입율 적용)'),
+              Text('• 가격 계산 (매입/판매 모드, 적용율 설정)'),
               Text('• Firestore 공용 데이터 저장'),
             ],
           ),

@@ -101,6 +101,42 @@ void main() {
       ); // 20000 * 0.7 = 14000
     });
 
+    test('CalculationItem 모드별 천원 단위 보정 테스트', () {
+      // Given
+      const item = CalculationItem(
+        fishingRodId: 'rod_001',
+        length: 20,
+        quantity: 2,
+        discountRate: 0.5,
+        saleRate: 0.5,
+      );
+      const unitPrice = 247000.0; // 50% 적용 시 123,500원
+
+      // When
+      final purchaseUnitPrice = item.getAdjustedUnitPriceForMode(
+        unitPrice,
+        CalculationPriceMode.purchase,
+      );
+      final saleUnitPrice = item.getAdjustedUnitPriceForMode(
+        unitPrice,
+        CalculationPriceMode.sale,
+      );
+      final purchaseFinalPrice = item.getFinalPriceForMode(
+        unitPrice,
+        CalculationPriceMode.purchase,
+      );
+      final saleFinalPrice = item.getFinalPriceForMode(
+        unitPrice,
+        CalculationPriceMode.sale,
+      );
+
+      // Then
+      expect(purchaseUnitPrice, equals(123000.0));
+      expect(saleUnitPrice, equals(124000.0));
+      expect(purchaseFinalPrice, equals(246000.0)); // 123000 * 2
+      expect(saleFinalPrice, equals(248000.0)); // 124000 * 2
+    });
+
     test('CalculationItem JSON 직렬화 테스트', () {
       // Given
       const item = CalculationItem(

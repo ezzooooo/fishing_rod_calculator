@@ -80,7 +80,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               fishingRodId: rod.id,
               length: length,
               quantity: quantity,
-              discountRate: 0.7, // 기본 70%
             );
       }
     }
@@ -101,6 +100,90 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _searchQuery = query.trim();
       });
     });
+  }
+
+  double _priceForMode(FishingRod rod, int length, CalculationMode mode) {
+    return mode == CalculationMode.purchase
+        ? rod.getPurchasePriceForLength(length)
+        : rod.getSalePriceForLength(length);
+  }
+
+  double _priceForCurrentMode(FishingRod rod, int length) {
+    return _priceForMode(rod, length, ref.read(calculationModeProvider));
+  }
+
+  List<double> _rateOptionsForMode(CalculationMode mode) {
+    if (mode == CalculationMode.sale) {
+      return const [
+        0.4,
+        0.45,
+        0.5,
+        0.55,
+        0.6,
+        0.65,
+        0.7,
+        0.75,
+        0.8,
+        0.85,
+        0.9,
+        0.95,
+        1.0,
+      ];
+    }
+
+    return const [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7];
+  }
+
+  double _rateForMode(CalculationItem item, CalculationMode mode) {
+    return item.getRateForMode(
+      mode == CalculationMode.purchase
+          ? CalculationPriceMode.purchase
+          : CalculationPriceMode.sale,
+    );
+  }
+
+  double _finalUnitPriceForMode(
+    FishingRod rod,
+    CalculationItem item,
+    CalculationMode mode,
+  ) {
+    final price = _priceForMode(rod, item.length, mode);
+    return item.getAdjustedUnitPriceForMode(
+      price,
+      mode == CalculationMode.purchase
+          ? CalculationPriceMode.purchase
+          : CalculationPriceMode.sale,
+    );
+  }
+
+  Widget _buildCalculationModeSelector(CalculationMode mode) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(right: 4),
+          child: Text('계산 모드', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        ChoiceChip(
+          label: const Text('매입'),
+          selected: mode == CalculationMode.purchase,
+          onSelected: (_) {
+            ref.read(calculationModeProvider.notifier).state =
+                CalculationMode.purchase;
+          },
+        ),
+        ChoiceChip(
+          label: const Text('판매'),
+          selected: mode == CalculationMode.sale,
+          onSelected: (_) {
+            ref.read(calculationModeProvider.notifier).state =
+                CalculationMode.sale;
+          },
+        ),
+      ],
+    );
   }
 
   void _clearQuantityInputs() {
@@ -147,6 +230,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final fishingRods = ref.watch(fishingRodProvider);
     final brands = ref.watch(brandProvider);
     final calculations = ref.watch(calculationProvider);
+    final calculationMode = ref.watch(calculationModeProvider);
     final totalQuantity = ref.watch(totalQuantityProvider);
     final totalOriginalPrice = ref.watch(totalOriginalPriceProvider);
     final totalFinalPrice = ref.watch(totalFinalPriceProvider);
@@ -181,9 +265,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       drawer: const AppDrawer(currentRoute: '/'),
       floatingActionButton: calculations.isNotEmpty
           ? FloatingActionButton.extended(
-              onPressed: () => _showPrintDialog(),
-              icon: const Icon(Icons.print),
-              label: const Text('인쇄 미리보기'),
+              onPressed: calculationMode == CalculationMode.sale
+                  ? _showSaleCopyDialog
+                  : _showPrintDialog,
+              icon: Icon(
+                calculationMode == CalculationMode.sale
+                    ? Icons.content_copy
+                    : Icons.print,
+              ),
+              label: Text(
+                calculationMode == CalculationMode.sale ? '복사하기' : '인쇄 미리보기',
+              ),
               backgroundColor: Colors.blue,
               foregroundColor: Colors.white,
             )
@@ -252,6 +344,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ),
                           ),
                         ],
+                        const SizedBox(height: 16),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: _buildCalculationModeSelector(calculationMode),
+                        ),
                         const SizedBox(height: 16),
 
                         // 낚시대 선택 드롭다운
@@ -385,6 +482,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                 // 계산 영역
                 if (_selectedRod != null) ...[
+                  if (isMobileLayout)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: _buildCalculationModeSelector(calculationMode),
+                      ),
+                    ),
                   Expanded(
                     child: Flex(
                       direction: isMobileLayout
@@ -449,8 +554,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                               .toList()
                                             ..sort();
                                       final length = sortedLengths[index];
-                                      final price = _selectedRod!
-                                          .getPriceForLength(length);
+                                      final price = _priceForMode(
+                                        _selectedRod!,
+                                        length,
+                                        calculationMode,
+                                      );
 
                                       return Padding(
                                         padding: const EdgeInsets.only(
@@ -485,7 +593,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                             ),
                                             const SizedBox(width: 8),
 
-                                            // 중고가 표시
+                                            // 선택된 계산 모드 가격 표시
                                             Container(
                                               width: isMobileLayout ? 74 : 80,
                                               padding:
@@ -497,9 +605,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                 crossAxisAlignment:
                                                     CrossAxisAlignment.start,
                                                 children: [
-                                                  const Text(
-                                                    '중고가:',
-                                                    style: TextStyle(
+                                                  Text(
+                                                    '${calculationMode.priceLabel}:',
+                                                    style: const TextStyle(
                                                       fontSize: 10,
                                                     ),
                                                   ),
@@ -560,8 +668,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                               _selectedRod!.id,
                                                           length: length,
                                                           quantity: quantity,
-                                                          discountRate:
-                                                              0.7, // 기본 70%
                                                         );
                                                   } else {
                                                     // 수량이 0이면 계산 항목 제거
@@ -623,7 +729,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                             Icons.tune,
                                             size: 16,
                                           ),
-                                          label: const Text('일괄 매입율'),
+                                          label: const Text('일괄 적용율'),
                                           style: TextButton.styleFrom(
                                             foregroundColor: Colors.blue,
                                           ),
@@ -656,7 +762,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                             Icons.tune,
                                             size: 16,
                                           ),
-                                          label: const Text('일괄 매입율'),
+                                          label: const Text('일괄 적용율'),
                                           style: TextButton.styleFrom(
                                             foregroundColor: Colors.blue,
                                           ),
@@ -718,10 +824,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                     WidgetStateProperty.all(
                                                       Colors.blue.shade50,
                                                     ),
-                                                columns: const [
+                                                columns: [
                                                   DataColumn(
                                                     label: Expanded(
-                                                      child: Text(
+                                                      child: const Text(
                                                         '칸수',
                                                         textAlign:
                                                             TextAlign.center,
@@ -735,7 +841,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                   ),
                                                   DataColumn(
                                                     label: Expanded(
-                                                      child: Text(
+                                                      child: const Text(
                                                         '수량',
                                                         textAlign:
                                                             TextAlign.center,
@@ -750,7 +856,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                   DataColumn(
                                                     label: Expanded(
                                                       child: Text(
-                                                        '중고가',
+                                                        calculationMode
+                                                            .priceLabel,
                                                         textAlign:
                                                             TextAlign.center,
                                                         style: TextStyle(
@@ -764,7 +871,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                   DataColumn(
                                                     label: Expanded(
                                                       child: Text(
-                                                        '총 평균거래가',
+                                                        calculationMode
+                                                            .totalPriceLabel,
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: 15,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  DataColumn(
+                                                    label: Expanded(
+                                                      child: const Text(
+                                                        '적용율',
                                                         textAlign:
                                                             TextAlign.center,
                                                         style: TextStyle(
@@ -778,21 +900,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                   DataColumn(
                                                     label: Expanded(
                                                       child: Text(
-                                                        '매입율',
-                                                        textAlign:
-                                                            TextAlign.center,
-                                                        style: TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          fontSize: 15,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  DataColumn(
-                                                    label: Expanded(
-                                                      child: Text(
-                                                        '최종 매입가',
+                                                        calculationMode
+                                                            .finalPriceLabel,
                                                         textAlign:
                                                             TextAlign.center,
                                                         style: TextStyle(
@@ -822,21 +931,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                           ))
                                                         .map((calculation) {
                                                           final rodPrice =
-                                                              _selectedRod!
-                                                                  .getPriceForLength(
-                                                                    calculation
-                                                                        .length,
-                                                                  );
+                                                              _priceForMode(
+                                                                _selectedRod!,
+                                                                calculation
+                                                                    .length,
+                                                                calculationMode,
+                                                              );
                                                           final originalPrice =
                                                               calculation
                                                                   .getTotalPrice(
                                                                     rodPrice,
                                                                   );
-                                                          final finalPrice =
-                                                              calculation
-                                                                  .getFinalPrice(
-                                                                    rodPrice,
-                                                                  );
+                                                          final finalPrice = calculation.getFinalPriceForMode(
+                                                            rodPrice,
+                                                            calculationMode ==
+                                                                    CalculationMode
+                                                                        .purchase
+                                                                ? CalculationPriceMode
+                                                                      .purchase
+                                                                : CalculationPriceMode
+                                                                      .sale,
+                                                          );
 
                                                           return DataRow(
                                                             cells: [
@@ -937,8 +1052,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                                           .centerRight,
                                                                   child: ExcludeFocus(
                                                                     child: DropdownButton<double>(
-                                                                      value: calculation
-                                                                          .discountRate,
+                                                                      value: _rateForMode(
+                                                                        calculation,
+                                                                        calculationMode,
+                                                                      ),
                                                                       isDense:
                                                                           true,
                                                                       underline:
@@ -950,15 +1067,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                                             .black87,
                                                                       ),
                                                                       items:
-                                                                          [
-                                                                            0.4,
-                                                                            0.45,
-                                                                            0.5,
-                                                                            0.55,
-                                                                            0.6,
-                                                                            0.65,
-                                                                            0.7,
-                                                                          ].map((
+                                                                          _rateOptionsForMode(
+                                                                            calculationMode,
+                                                                          ).map((
                                                                             rate,
                                                                           ) {
                                                                             return DropdownMenuItem(
@@ -982,6 +1093,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                                                 _selectedRod!.id,
                                                                                 calculation.length,
                                                                                 rate,
+                                                                                mode: calculationMode,
                                                                               );
                                                                         }
                                                                       },
@@ -1069,8 +1181,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           width: isMobileLayout ? 150 : 220,
                           child: Column(
                             children: [
-                              const Text(
-                                '총 평균거래가',
+                              Text(
+                                calculationMode.totalPriceLabel,
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                               Text(
@@ -1087,8 +1199,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           width: isMobileLayout ? 150 : 220,
                           child: Column(
                             children: [
-                              const Text(
-                                '총 최종매입가',
+                              Text(
+                                '총 ${calculationMode.finalPriceLabel}',
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                               Text(
@@ -1136,27 +1248,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _showBulkDiscountRateDialog() {
     double? selectedRate;
+    final calculationMode = ref.read(calculationModeProvider);
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('일괄 매입율 설정'),
+          title: const Text('일괄 적용율 설정'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                '선택된 낚시대의 모든 칸수에 동일한 매입율을 적용합니다.',
+                '선택된 낚시대의 모든 칸수에 동일한 적용율을 적용합니다.',
                 style: TextStyle(fontSize: 14),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<double>(
                 decoration: const InputDecoration(
-                  labelText: '매입율 선택',
+                  labelText: '적용율 선택',
                   border: OutlineInputBorder(),
                 ),
                 initialValue: selectedRate,
-                items: [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7].map((rate) {
+                items: _rateOptionsForMode(calculationMode).map((rate) {
                   return DropdownMenuItem(
                     value: rate,
                     child: Text('${(rate * 100).toInt()}%'),
@@ -1179,7 +1292,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onPressed: selectedRate == null
                   ? null
                   : () {
-                      // 선택된 낚시대의 모든 계산 항목에 매입율 적용
+                      // 선택된 낚시대의 모든 계산 항목에 적용율 적용
                       final currentCalculations = ref
                           .read(calculationProvider)
                           .where((c) => c.fishingRodId == _selectedRod!.id)
@@ -1192,6 +1305,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               _selectedRod!.id,
                               calculation.length,
                               selectedRate!,
+                              mode: calculationMode,
                             );
                       }
 
@@ -1199,7 +1313,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            '모든 칸수에 ${(selectedRate! * 100).toInt()}% 매입율이 적용되었습니다',
+                            '모든 칸수에 ${(selectedRate! * 100).toInt()}% 적용율이 적용되었습니다',
                           ),
                           backgroundColor: Colors.green,
                         ),
@@ -1336,6 +1450,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     double fontSize,
     double padding,
   ) {
+    final calculationMode = ref.read(calculationModeProvider);
+
     return pw.TableRow(
       decoration: const pw.BoxDecoration(color: PdfColors.blue100),
       children: [
@@ -1356,7 +1472,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           padding: padding,
         ),
         _buildPdfCell(
-          '중고가',
+          calculationMode.priceLabel,
           isHeader: true,
           font: font,
           boldFont: boldFont,
@@ -1364,7 +1480,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           padding: padding,
         ),
         _buildPdfCell(
-          '총 평균거래가',
+          calculationMode.totalPriceLabel,
           isHeader: true,
           font: font,
           boldFont: boldFont,
@@ -1372,7 +1488,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           padding: padding,
         ),
         _buildPdfCell(
-          '매입율',
+          '적용율',
           isHeader: true,
           font: font,
           boldFont: boldFont,
@@ -1380,7 +1496,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           padding: padding,
         ),
         _buildPdfCell(
-          '최종 매입가',
+          calculationMode.finalPriceLabel,
           isHeader: true,
           font: font,
           boldFont: boldFont,
@@ -1397,9 +1513,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     double fontSize,
     double padding,
   ) {
-    final rodPrice = _selectedRod!.getPriceForLength(calculation.length);
+    final calculationMode = ref.read(calculationModeProvider);
+    final rodPrice = _priceForCurrentMode(_selectedRod!, calculation.length);
     final originalPrice = calculation.getTotalPrice(rodPrice);
-    final finalPrice = calculation.getFinalPrice(rodPrice);
+    final finalPrice = calculation.getFinalPriceForMode(
+      rodPrice,
+      calculationMode == CalculationMode.purchase
+          ? CalculationPriceMode.purchase
+          : CalculationPriceMode.sale,
+    );
 
     return pw.TableRow(
       children: [
@@ -1428,7 +1550,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           padding: padding,
         ),
         _buildPdfCell(
-          '${(calculation.discountRate * 100).toInt()}%',
+          '${(_rateForMode(calculation, calculationMode) * 100).toInt()}%',
           font: font,
           fontSize: fontSize,
           padding: padding,
@@ -1561,6 +1683,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildPrintPreviewInfoCard({
     required FishingRod selectedRod,
     required String brandName,
+    required CalculationMode calculationMode,
     required int dataRowCount,
     required String lengthRangeText,
     required int totalQuantity,
@@ -1588,13 +1711,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             spacing: 10,
             runSpacing: 8,
             children: [
+              _buildPrintPreviewInfoChip('계산 모드', calculationMode.label),
               _buildPrintPreviewInfoChip('브랜드', brandName),
               _buildPrintPreviewInfoChip('낚시대', selectedRod.name),
               _buildPrintPreviewInfoChip('칸수 범위', lengthRangeText),
               _buildPrintPreviewInfoChip('데이터 행', '$dataRowCount행'),
               _buildPrintPreviewInfoChip('총 수량', '$totalQuantity대'),
               _buildPrintPreviewInfoChip(
-                '총 최종 매입가',
+                '총 ${calculationMode.finalPriceLabel}',
                 '${_numberFormat.format(totalFinalPrice.toInt())}원',
               ),
               _buildPrintPreviewInfoChip('생성일시', _formatDateTime(generatedAt)),
@@ -1657,9 +1781,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     required EdgeInsetsGeometry cellPadding,
     List<double>? columnWidths,
   }) {
-    final rodPrice = selectedRod.getPriceForLength(calculation.length);
+    final calculationMode = ref.read(calculationModeProvider);
+    final rodPrice = _priceForCurrentMode(selectedRod, calculation.length);
     final originalPrice = calculation.getTotalPrice(rodPrice);
-    final finalPrice = calculation.getFinalPrice(rodPrice);
+    final finalPrice = calculation.getFinalPriceForMode(
+      rodPrice,
+      calculationMode == CalculationMode.purchase
+          ? CalculationPriceMode.purchase
+          : CalculationPriceMode.sale,
+    );
 
     return DataRow(
       cells: [
@@ -1695,7 +1825,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           scaleDown: columnWidths != null,
         ),
         _buildPrintPreviewCell(
-          '${(calculation.discountRate * 100).toInt()}%',
+          '${(_rateForMode(calculation, calculationMode) * 100).toInt()}%',
           fontSize: bodyFontSize,
           padding: cellPadding,
           width: columnWidths?[4],
@@ -1781,11 +1911,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     double headerFontSize, {
     List<double>? columnWidths,
   }) {
+    final calculationMode = ref.read(calculationModeProvider);
     final headerStyle = TextStyle(
       fontWeight: FontWeight.bold,
       fontSize: headerFontSize,
     );
-    final labels = <String>['칸수', '수량', '중고가', '총 평균거래가', '매입율', '최종 매입가'];
+    final labels = <String>[
+      '칸수',
+      '수량',
+      calculationMode.priceLabel,
+      calculationMode.totalPriceLabel,
+      '적용율',
+      calculationMode.finalPriceLabel,
+    ];
 
     return List<DataColumn>.generate(labels.length, (index) {
       final textStyle = index == 5
@@ -1894,12 +2032,140 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  String _formatPriceInMan(double price) {
+    final manPrice = price / 10000;
+    final rounded = (manPrice * 10).round() / 10;
+    final isWholeNumber = rounded == rounded.roundToDouble();
+    final formatted = isWholeNumber
+        ? rounded.toStringAsFixed(0)
+        : rounded.toStringAsFixed(1);
+    return '$formatted만';
+  }
+
+  String _buildSalePreviewLine(
+    FishingRod selectedRod,
+    CalculationItem calculation,
+  ) {
+    final unitPrice = _finalUnitPriceForMode(
+      selectedRod,
+      calculation,
+      CalculationMode.sale,
+    );
+    return '${calculation.length}칸 - ${calculation.quantity}대 - 대당 ${_formatPriceInMan(unitPrice)}';
+  }
+
+  String _buildSalePreviewText(
+    FishingRod selectedRod,
+    List<CalculationItem> calculations,
+  ) {
+    return calculations
+        .map((calculation) => _buildSalePreviewLine(selectedRod, calculation))
+        .join('\n');
+  }
+
+  Future<void> _copySalePreviewText(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('판매 글 텍스트가 복사되었습니다'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  void _showSaleCopyDialog() {
+    final selectedRod = _selectedRod;
+    if (selectedRod == null) {
+      return;
+    }
+
+    final calculations = ref.read(calculationProvider);
+    final currentCalculations =
+        calculations.where((c) => c.fishingRodId == selectedRod.id).toList()
+          ..sort((a, b) => a.length.compareTo(b.length));
+
+    if (currentCalculations.isEmpty) {
+      return;
+    }
+
+    double totalSalePrice = 0;
+    for (final calculation in currentCalculations) {
+      final unitPrice = selectedRod.getSalePriceForLength(calculation.length);
+      totalSalePrice += calculation.getFinalPriceForMode(
+        unitPrice,
+        CalculationPriceMode.sale,
+      );
+    }
+
+    final previewText = _buildSalePreviewText(selectedRod, currentCalculations);
+    final clipboardText =
+        '$previewText\n\n총 가격: ${_numberFormat.format(totalSalePrice.toInt())}원';
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('판매 글 미리보기'),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: SelectableText(
+                  previewText,
+                  style: const TextStyle(fontSize: 15, height: 1.6),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '총 가격: ${_numberFormat.format(totalSalePrice.toInt())}원',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('닫기'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              await _copySalePreviewText(clipboardText);
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext);
+              }
+            },
+            icon: const Icon(Icons.content_copy),
+            label: const Text('복사하기'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showPrintDialog() {
     final selectedRod = _selectedRod;
     if (selectedRod == null) {
       return;
     }
 
+    final calculationMode = ref.read(calculationModeProvider);
     final calculations = ref.read(calculationProvider);
     final currentCalculations =
         calculations.where((c) => c.fishingRodId == selectedRod.id).toList()
@@ -1914,10 +2180,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     double totalOriginalPrice = 0;
     double totalFinalPrice = 0;
     for (final calculation in currentCalculations) {
-      final rodPrice = selectedRod.getPriceForLength(calculation.length);
+      final rodPrice = _priceForMode(
+        selectedRod,
+        calculation.length,
+        calculationMode,
+      );
       totalQuantity += calculation.quantity;
       totalOriginalPrice += calculation.getTotalPrice(rodPrice);
-      totalFinalPrice += calculation.getFinalPrice(rodPrice);
+      totalFinalPrice += calculation.getFinalPriceForMode(
+        rodPrice,
+        calculationMode == CalculationMode.purchase
+            ? CalculationPriceMode.purchase
+            : CalculationPriceMode.sale,
+      );
     }
 
     final generatedAt = DateTime.now();
@@ -1974,6 +2249,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   _buildPrintPreviewInfoCard(
                     selectedRod: selectedRod,
                     brandName: brand.name,
+                    calculationMode: calculationMode,
                     dataRowCount: currentCalculations.length,
                     lengthRangeText: lengthRangeText,
                     totalQuantity: totalQuantity,
@@ -2084,14 +2360,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     ),
                                   ),
                                   Text(
-                                    '총 평균거래가: ${_numberFormat.format(totalOriginalPrice.toInt())}원',
+                                    '${calculationMode.totalPriceLabel}: ${_numberFormat.format(totalOriginalPrice.toInt())}원',
                                     style: const TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                   Text(
-                                    '총 최종 매입가: ${_numberFormat.format(totalFinalPrice.toInt())}원',
+                                    '총 ${calculationMode.finalPriceLabel}: ${_numberFormat.format(totalFinalPrice.toInt())}원',
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.bold,

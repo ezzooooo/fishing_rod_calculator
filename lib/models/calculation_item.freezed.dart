@@ -24,7 +24,8 @@ mixin _$CalculationItem {
   String get fishingRodId => throw _privateConstructorUsedError;
   int get length => throw _privateConstructorUsedError;
   int get quantity => throw _privateConstructorUsedError;
-  double get discountRate => throw _privateConstructorUsedError;
+  double get discountRate => throw _privateConstructorUsedError; // 매입 적용율
+  double get saleRate => throw _privateConstructorUsedError;
 
   /// Serializes this CalculationItem to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -48,6 +49,7 @@ abstract class $CalculationItemCopyWith<$Res> {
     int length,
     int quantity,
     double discountRate,
+    double saleRate,
   });
 }
 
@@ -70,6 +72,7 @@ class _$CalculationItemCopyWithImpl<$Res, $Val extends CalculationItem>
     Object? length = null,
     Object? quantity = null,
     Object? discountRate = null,
+    Object? saleRate = null,
   }) {
     return _then(
       _value.copyWith(
@@ -88,6 +91,10 @@ class _$CalculationItemCopyWithImpl<$Res, $Val extends CalculationItem>
             discountRate: null == discountRate
                 ? _value.discountRate
                 : discountRate // ignore: cast_nullable_to_non_nullable
+                      as double,
+            saleRate: null == saleRate
+                ? _value.saleRate
+                : saleRate // ignore: cast_nullable_to_non_nullable
                       as double,
           )
           as $Val,
@@ -109,6 +116,7 @@ abstract class _$$CalculationItemImplCopyWith<$Res>
     int length,
     int quantity,
     double discountRate,
+    double saleRate,
   });
 }
 
@@ -130,6 +138,7 @@ class __$$CalculationItemImplCopyWithImpl<$Res>
     Object? length = null,
     Object? quantity = null,
     Object? discountRate = null,
+    Object? saleRate = null,
   }) {
     return _then(
       _$CalculationItemImpl(
@@ -149,6 +158,10 @@ class __$$CalculationItemImplCopyWithImpl<$Res>
             ? _value.discountRate
             : discountRate // ignore: cast_nullable_to_non_nullable
                   as double,
+        saleRate: null == saleRate
+            ? _value.saleRate
+            : saleRate // ignore: cast_nullable_to_non_nullable
+                  as double,
       ),
     );
   }
@@ -162,6 +175,7 @@ class _$CalculationItemImpl extends _CalculationItem {
     required this.length,
     required this.quantity,
     required this.discountRate,
+    this.saleRate = 1.0,
   }) : super._();
 
   factory _$CalculationItemImpl.fromJson(Map<String, dynamic> json) =>
@@ -175,10 +189,14 @@ class _$CalculationItemImpl extends _CalculationItem {
   final int quantity;
   @override
   final double discountRate;
+  // 매입 적용율
+  @override
+  @JsonKey()
+  final double saleRate;
 
   @override
   String toString() {
-    return 'CalculationItem(fishingRodId: $fishingRodId, length: $length, quantity: $quantity, discountRate: $discountRate)';
+    return 'CalculationItem(fishingRodId: $fishingRodId, length: $length, quantity: $quantity, discountRate: $discountRate, saleRate: $saleRate)';
   }
 
   @override
@@ -192,13 +210,21 @@ class _$CalculationItemImpl extends _CalculationItem {
             (identical(other.quantity, quantity) ||
                 other.quantity == quantity) &&
             (identical(other.discountRate, discountRate) ||
-                other.discountRate == discountRate));
+                other.discountRate == discountRate) &&
+            (identical(other.saleRate, saleRate) ||
+                other.saleRate == saleRate));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, fishingRodId, length, quantity, discountRate);
+  int get hashCode => Object.hash(
+    runtimeType,
+    fishingRodId,
+    length,
+    quantity,
+    discountRate,
+    saleRate,
+  );
 
   /// Create a copy of CalculationItem
   /// with the given fields replaced by the non-null parameter values.
@@ -223,6 +249,7 @@ abstract class _CalculationItem extends CalculationItem {
     required final int length,
     required final int quantity,
     required final double discountRate,
+    final double saleRate,
   }) = _$CalculationItemImpl;
   const _CalculationItem._() : super._();
 
@@ -236,7 +263,9 @@ abstract class _CalculationItem extends CalculationItem {
   @override
   int get quantity;
   @override
-  double get discountRate;
+  double get discountRate; // 매입 적용율
+  @override
+  double get saleRate;
 
   /// Create a copy of CalculationItem
   /// with the given fields replaced by the non-null parameter values.

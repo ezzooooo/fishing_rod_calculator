@@ -79,29 +79,7 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
     final idCandidate = item['id']?.toString().trim() ?? '';
     final id = idCandidate.isEmpty ? _uuid.v4() : idCandidate;
 
-    final lengthPrices = <int, double>{};
-    final rawLengthPrices = item['lengthPrices'];
-    if (rawLengthPrices is Map) {
-      for (final entry in rawLengthPrices.entries) {
-        final length = int.tryParse(entry.key.toString());
-        final price = (entry.value as num?)?.toDouble();
-        if (length != null && price != null) {
-          lengthPrices[length] = price;
-        }
-      }
-    }
-
-    return FishingRod(
-      id: id,
-      name: item['name']?.toString() ?? '',
-      brandId: item['brandId']?.toString() ?? '',
-      minValue: (item['minValue'] as num?)?.toInt() ?? 18,
-      maxValue: (item['maxValue'] as num?)?.toInt() ?? 60,
-      usedPrice: (item['usedPrice'] as num?)?.toDouble() ?? 0.0,
-      lengthPrices: lengthPrices,
-      createdAt: _parseDate(item['createdAt']),
-      updatedAt: _parseDate(item['updatedAt']),
-    );
+    return FishingRod.fromJson({...item, 'id': id});
   }
 
   Future<void> _loadDefaultFishingRods() async {
@@ -304,23 +282,7 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
 
       // 낚시대 데이터를 JSON으로 변환
       final List<Map<String, dynamic>> rodData = fishingRods
-          .map(
-            (rod) => {
-              'id': rod.id,
-              'name': rod.name,
-              'brandId': rod.brandId,
-              'minValue': rod.minValue,
-              'maxValue': rod.maxValue,
-              'usedPrice': rod.usedPrice,
-              'lengthPrices': Map<String, dynamic>.from(
-                rod.lengthPrices.map(
-                  (key, value) => MapEntry(key.toString(), value),
-                ),
-              ),
-              'createdAt': rod.createdAt?.toIso8601String(),
-              'updatedAt': rod.updatedAt?.toIso8601String(),
-            },
-          )
+          .map((rod) => rod.toJson())
           .toList();
 
       final String jsonString = const JsonEncoder.withIndent(
