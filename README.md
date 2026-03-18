@@ -90,9 +90,12 @@ flutter build web --release \
 
 ```bash
 npx wrangler whoami
-npx wrangler pages deploy build/web --project-name <your-pages-project>
+npx wrangler pages deploy build/web --project-name fishjoongo-helper --branch master
 ```
 
+- Cloudflare Pages 프로젝트명: `fishjoongo-helper`
+- 운영 도메인: `https://fishjoongo-helper.pages.dev`
+- 운영 배포 브랜치: `master`
 - `wrangler.toml`에 `pages_build_output_dir = "build/web"` 설정됨
 - SPA 라우팅용 `web/_redirects` 포함
 
