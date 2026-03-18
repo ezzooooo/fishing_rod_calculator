@@ -83,6 +83,7 @@ flutter run -d chrome \
 
 ```bash
 flutter build web --release \
+  --pwa-strategy=none \
   --dart-define=FIREBASE_WEB_API_KEY=$FIREBASE_WEB_API_KEY
 ```
 
@@ -90,12 +91,14 @@ flutter build web --release \
 
 ```bash
 npx wrangler whoami
-npx wrangler pages deploy build/web --project-name fishjoongo-helper --branch master
+./scripts/deploy_pages.sh
 ```
 
 - Cloudflare Pages 프로젝트명: `fishjoongo-helper`
 - 운영 도메인: `https://fishjoongo-helper.pages.dev`
 - 운영 배포 브랜치: `master`
+- Flutter Web 서비스 워커는 배포 시 비활성화함 (`--pwa-strategy=none`)
+- `web/flutter_bootstrap.js`에서 기존 서비스 워커를 제거하고, 새 빌드 감지 시 자동 새로고침함
 - `wrangler.toml`에 `pages_build_output_dir = "build/web"` 설정됨
 - SPA 라우팅용 `web/_redirects` 포함
 

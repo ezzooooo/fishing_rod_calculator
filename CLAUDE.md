@@ -11,12 +11,12 @@ This is a Flutter desktop application for Windows called "낚시대 계산기" (
 ### Core Commands
 - `flutter run -d windows` - Run the application on Windows desktop
 - `flutter build windows` - Build the Windows desktop application
-- `flutter build web --release --dart-define=FIREBASE_WEB_API_KEY=$FIREBASE_WEB_API_KEY` - Build the web app for deployment
+- `flutter build web --release --pwa-strategy=none --dart-define=FIREBASE_WEB_API_KEY=$FIREBASE_WEB_API_KEY` - Build the web app for deployment
 - `flutter test` - Run all tests
 - `flutter analyze` - Run static analysis
 - `flutter pub get` - Install dependencies
 - `flutter pub upgrade` - Upgrade dependencies
-- `npx wrangler pages deploy build/web --project-name fishjoongo-helper --branch master` - Deploy to Cloudflare Pages production
+- `./scripts/deploy_pages.sh` - Deploy to Cloudflare Pages production
 
 ### Code Generation
 - `flutter packages pub run build_runner build` - Generate Freezed/JSON serialization code
@@ -121,3 +121,5 @@ flutter packages pub run build_runner build --delete-conflicting-outputs
 - Uses Material Design 3 (`useMaterial3: true`)
 - Cloudflare Pages production target is `fishjoongo-helper` (`https://fishjoongo-helper.pages.dev`)
 - Use `master` when deploying to production Pages
+- Web deployments disable Flutter's offline-first service worker to reduce stale-client issues
+- `web/flutter_bootstrap.js` unregisters legacy service workers and reloads when a new build is detected
