@@ -6,6 +6,7 @@ import '../providers/fishing_rod_provider.dart';
 import '../providers/brand_provider.dart';
 import '../models/brand.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/app_text_fields.dart';
 
 class FishingRodManagementScreen extends ConsumerStatefulWidget {
   const FishingRodManagementScreen({super.key});
@@ -79,7 +80,7 @@ class _FishingRodManagementScreenState
             color: Colors.grey.shade50,
             child: Column(
               children: [
-                TextField(
+                AppTextField(
                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText: '낚시대명 또는 브랜드명으로 검색',

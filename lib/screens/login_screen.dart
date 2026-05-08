@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/auth_provider.dart';
+import '../widgets/app_text_fields.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -115,7 +116,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 24),
-                        TextFormField(
+                        AppTextFormField(
                           controller: _emailController,
                           enabled: !_isSubmitting,
                           keyboardType: TextInputType.emailAddress,
@@ -132,7 +133,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           },
                         ),
                         const SizedBox(height: 12),
-                        TextFormField(
+                        AppTextFormField(
                           controller: _passwordController,
                           enabled: !_isSubmitting,
                           obscureText: true,

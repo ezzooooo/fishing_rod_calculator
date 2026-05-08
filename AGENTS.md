@@ -13,3 +13,8 @@
 
 - Web build command:
   `flutter build web --release --pwa-strategy=none --dart-define=FIREBASE_WEB_API_KEY=$FIREBASE_WEB_API_KEY`
+
+## UI
+
+- For new text inputs, use `AppTextField` or `AppTextFormField` from `lib/widgets/app_text_fields.dart` instead of raw `TextField` or `TextFormField`.
+- Reason: app text inputs select all text on focus, including keyboard Tab navigation.

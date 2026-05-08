@@ -13,6 +13,7 @@ import '../models/fishing_rod.dart';
 import '../models/brand.dart';
 import '../models/calculation_item.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/app_text_fields.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -313,7 +314,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: Column(
                       children: [
                         // 검색 바
-                        TextField(
+                        AppTextField(
                           controller: _searchController,
                           decoration: InputDecoration(
                             hintText: '낚시대명 또는 브랜드명으로 검색',
@@ -626,7 +627,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                                             // 수량 입력 필드
                                             Expanded(
-                                              child: TextFormField(
+                                              child: AppTextFormField(
                                                 controller:
                                                     _quantityControllers[length],
                                                 focusNode:

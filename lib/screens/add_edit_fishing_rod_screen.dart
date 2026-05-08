@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../providers/fishing_rod_provider.dart';
 import '../providers/brand_provider.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/app_text_fields.dart';
 import '../models/fishing_rod.dart';
 
 enum PriceType { purchase, sale }
@@ -238,7 +239,7 @@ class _AddEditFishingRodScreenState
                                   },
                                 ),
                                 const SizedBox(height: 16),
-                                TextFormField(
+                                AppTextFormField(
                                   controller: _nameController,
                                   decoration: const InputDecoration(
                                     labelText: '낚시대명',
@@ -397,7 +398,7 @@ class _AddEditFishingRodScreenState
                                         if (isMobileLayout)
                                           Column(
                                             children: [
-                                              TextFormField(
+                                              AppTextFormField(
                                                 controller: _minValueController,
                                                 decoration:
                                                     const InputDecoration(
@@ -415,7 +416,7 @@ class _AddEditFishingRodScreenState
                                                 ],
                                               ),
                                               const SizedBox(height: 8),
-                                              TextFormField(
+                                              AppTextFormField(
                                                 controller: _maxValueController,
                                                 decoration:
                                                     const InputDecoration(
@@ -438,7 +439,7 @@ class _AddEditFishingRodScreenState
                                           Row(
                                             children: [
                                               Expanded(
-                                                child: TextFormField(
+                                                child: AppTextFormField(
                                                   controller:
                                                       _minValueController,
                                                   decoration:
@@ -459,7 +460,7 @@ class _AddEditFishingRodScreenState
                                               ),
                                               const SizedBox(width: 12),
                                               Expanded(
-                                                child: TextFormField(
+                                                child: AppTextFormField(
                                                   controller:
                                                       _maxValueController,
                                                   decoration:
@@ -793,7 +794,7 @@ class _AddEditFishingRodScreenState
     final controllers = _controllersFor(type);
     final focusNodes = _focusNodesFor(type);
 
-    return TextFormField(
+    return AppTextFormField(
       controller: controllers[length],
       focusNode: focusNodes[length],
       decoration: InputDecoration(
@@ -801,6 +802,15 @@ class _AddEditFishingRodScreenState
         hintText: '가격 입력',
         border: const OutlineInputBorder(),
         prefixIcon: const Icon(Icons.attach_money, size: 20),
+        suffixIcon: ExcludeFocus(
+          child: IconButton(
+            tooltip: '${_labelFor(type)} 자동 설정',
+            icon: const Icon(Icons.auto_fix_high, size: 20),
+            onPressed: _isLoading
+                ? null
+                : () => _showSteppedPriceDialog(type, initialLength: length),
+          ),
+        ),
         suffixText: '원',
         isDense: true,
         errorStyle: const TextStyle(fontSize: 11),
@@ -1032,6 +1042,186 @@ class _AddEditFishingRodScreenState
     }
   }
 
+  bool _applySteppedPrice({
+    required PriceType type,
+    required int baseLength,
+    required String basePriceText,
+    required String stepText,
+  }) {
+    final basePrice = int.tryParse(basePriceText);
+    final step = int.tryParse(stepText);
+
+    if (!_selectedLengths.contains(baseLength)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('기준 칸수를 선택해주세요'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+
+    if (basePrice == null || basePrice < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('올바른 기준 ${_labelFor(type)}를 입력해주세요'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+
+    if (step == null || step < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('올바른 칸수별 가격 차이를 입력해주세요'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+
+    final sortedLengths = _selectedLengths.toList()..sort();
+    final baseIndex = sortedLengths.indexOf(baseLength);
+    final generatedPrices = <int, int>{};
+
+    for (int i = 0; i < sortedLengths.length; i++) {
+      final length = sortedLengths[i];
+      final price = basePrice + ((i - baseIndex) * step);
+      if (price < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('자동 설정 결과에 0원보다 낮은 가격이 있습니다'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return false;
+      }
+      generatedPrices[length] = price;
+    }
+
+    final controllers = _controllersFor(type);
+    setState(() {
+      for (final entry in generatedPrices.entries) {
+        controllers[entry.key]?.text = entry.value.toString();
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '$baseLength칸 ${_numberFormat.format(basePrice)}원을 기준으로 ${_labelFor(type)}가 자동 설정되었습니다',
+        ),
+        backgroundColor: Colors.green,
+      ),
+    );
+    return true;
+  }
+
+  void _showSteppedPriceDialog(PriceType type, {required int initialLength}) {
+    int selectedLength = initialLength;
+    final basePriceController = TextEditingController(
+      text: _controllersFor(type)[initialLength]?.text ?? '',
+    );
+    final stepController = TextEditingController();
+    final sortedLengths = _selectedLengths.toList()..sort();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('${_labelFor(type)} 자동 설정'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<int>(
+                initialValue: selectedLength,
+                decoration: const InputDecoration(
+                  labelText: '기준 칸수',
+                  border: OutlineInputBorder(),
+                  suffixText: '칸',
+                ),
+                items: sortedLengths
+                    .map(
+                      (length) => DropdownMenuItem<int>(
+                        value: length,
+                        child: Text('$length칸'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) {
+                    return;
+                  }
+                  setDialogState(() {
+                    selectedLength = value;
+                    basePriceController.text =
+                        _controllersFor(type)[value]?.text ?? '';
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              AppTextFormField(
+                controller: basePriceController,
+                decoration: InputDecoration(
+                  labelText: '기준 ${_labelFor(type)}',
+                  border: const OutlineInputBorder(),
+                  suffixText: '원',
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                autofocus: basePriceController.text.isEmpty,
+              ),
+              const SizedBox(height: 12),
+              AppTextFormField(
+                controller: stepController,
+                decoration: const InputDecoration(
+                  labelText: '칸수별 가격 차이',
+                  border: OutlineInputBorder(),
+                  suffixText: '원',
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                autofocus: false,
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '낮은 칸수는 차감하고 높은 칸수는 더합니다.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () {
+                final applied = _applySteppedPrice(
+                  type: type,
+                  baseLength: selectedLength,
+                  basePriceText: basePriceController.text,
+                  stepText: stepController.text,
+                );
+                if (applied) {
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('적용'),
+            ),
+          ],
+        ),
+      ),
+    ).whenComplete(() {
+      basePriceController.dispose();
+      stepController.dispose();
+    });
+  }
+
   void _showBulkPriceDialog(PriceType type) {
     final bulkPriceController = TextEditingController();
 
@@ -1047,7 +1237,7 @@ class _AddEditFishingRodScreenState
               style: TextStyle(color: Colors.grey.shade600),
             ),
             const SizedBox(height: 16),
-            TextFormField(
+            AppTextFormField(
               controller: bulkPriceController,
               decoration: InputDecoration(
                 labelText: '적용할 ${_labelFor(type)}',

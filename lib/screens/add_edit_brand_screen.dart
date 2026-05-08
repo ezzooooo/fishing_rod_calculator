@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/brand_provider.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/app_text_fields.dart';
 
 class AddEditBrandScreen extends ConsumerStatefulWidget {
   final String? brandId;
@@ -95,7 +96,7 @@ class _AddEditBrandScreenState extends ConsumerState<AddEditBrandScreen> {
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 16),
-                            TextFormField(
+                            AppTextFormField(
                               controller: _nameController,
                               decoration: const InputDecoration(
                                 labelText: '브랜드명',
