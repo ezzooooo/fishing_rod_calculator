@@ -11,6 +11,9 @@ import '../models/fishing_rod.dart';
 
 enum PriceType { purchase, sale }
 
+const int _minimumSelectableLength = 15;
+const int _maximumSelectableLength = 80;
+
 class AddEditFishingRodScreen extends ConsumerStatefulWidget {
   final String? fishingRodId;
 
@@ -529,7 +532,7 @@ class _AddEditFishingRodScreenState
                                   const SizedBox(height: 16),
                                 ],
 
-                                // 칸수 선택 칩들 (16~80)
+                                // 칸수 선택 칩들 (15~80)
                                 Text(
                                   '사용 가능한 칸수 (탭하여 선택/해제)',
                                   style: Theme.of(context).textTheme.bodyMedium
@@ -539,25 +542,30 @@ class _AddEditFishingRodScreenState
                                 Wrap(
                                   spacing: 6,
                                   runSpacing: 4,
-                                  children: List.generate(65, (index) {
-                                    final length =
-                                        16 + (index); // 16, 18, 20, ..., 80
-                                    final isSelected = _selectedLengths
-                                        .contains(length);
+                                  children: List.generate(
+                                    _maximumSelectableLength -
+                                        _minimumSelectableLength +
+                                        1,
+                                    (index) {
+                                      final length =
+                                          _minimumSelectableLength + index;
+                                      final isSelected = _selectedLengths
+                                          .contains(length);
 
-                                    return FilterChip(
-                                      label: Text('$length칸'),
-                                      selected: isSelected,
-                                      onSelected: _isLoading
-                                          ? null
-                                          : (selected) {
-                                              _toggleLengthSelection(length);
-                                            },
-                                      backgroundColor: Colors.grey.shade100,
-                                      selectedColor: Colors.blue.shade100,
-                                      checkmarkColor: Colors.blue.shade700,
-                                    );
-                                  }),
+                                      return FilterChip(
+                                        label: Text('$length칸'),
+                                        selected: isSelected,
+                                        onSelected: _isLoading
+                                            ? null
+                                            : (selected) {
+                                                _toggleLengthSelection(length);
+                                              },
+                                        backgroundColor: Colors.grey.shade100,
+                                        selectedColor: Colors.blue.shade100,
+                                        checkmarkColor: Colors.blue.shade700,
+                                      );
+                                    },
+                                  ),
                                 ),
 
                                 if (_selectedLengths.isNotEmpty) ...[
@@ -1088,16 +1096,7 @@ class _AddEditFishingRodScreenState
     for (int i = 0; i < sortedLengths.length; i++) {
       final length = sortedLengths[i];
       final price = basePrice + ((i - baseIndex) * step);
-      if (price < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('자동 설정 결과에 0원보다 낮은 가격이 있습니다'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return false;
-      }
-      generatedPrices[length] = price;
+      generatedPrices[length] = price < 0 ? 0 : price;
     }
 
     final controllers = _controllersFor(type);
@@ -1320,8 +1319,12 @@ class _AddEditFishingRodScreenState
 
       // 범위 설정 (선택된 칸수가 있으면 그것을 기준으로, 없으면 기본값)
       final sortedLengths = _selectedLengths.toList()..sort();
-      final minValue = sortedLengths.isNotEmpty ? sortedLengths.first : 18;
-      final maxValue = sortedLengths.isNotEmpty ? sortedLengths.last : 60;
+      final minValue = sortedLengths.isNotEmpty
+          ? sortedLengths.first
+          : _minimumSelectableLength;
+      final maxValue = sortedLengths.isNotEmpty
+          ? sortedLengths.last
+          : _maximumSelectableLength;
 
       final purchaseLengthPrices = <int, double>{};
       final saleLengthPrices = <int, double>{};

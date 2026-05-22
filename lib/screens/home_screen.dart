@@ -1668,7 +1668,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       child: RichText(
         text: TextSpan(
-          style: const TextStyle(fontSize: 12, color: Colors.black87),
+          style: const TextStyle(fontSize: 14, color: Colors.black87),
           children: [
             TextSpan(
               text: '$label: ',
@@ -1685,12 +1685,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     required FishingRod selectedRod,
     required String brandName,
     required CalculationMode calculationMode,
-    required int dataRowCount,
-    required String lengthRangeText,
-    required int totalQuantity,
-    required double totalFinalPrice,
-    required DateTime generatedAt,
-    required bool isSplitLayout,
   }) {
     return Container(
       width: double.infinity,
@@ -1703,11 +1697,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '인쇄 미리보기',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
           Wrap(
             spacing: 10,
             runSpacing: 8,
@@ -1715,19 +1704,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               _buildPrintPreviewInfoChip('계산 모드', calculationMode.label),
               _buildPrintPreviewInfoChip('브랜드', brandName),
               _buildPrintPreviewInfoChip('낚시대', selectedRod.name),
-              _buildPrintPreviewInfoChip('칸수 범위', lengthRangeText),
-              _buildPrintPreviewInfoChip('데이터 행', '$dataRowCount행'),
-              _buildPrintPreviewInfoChip('총 수량', '$totalQuantity대'),
-              _buildPrintPreviewInfoChip(
-                '총 ${calculationMode.finalPriceLabel}',
-                '${_numberFormat.format(totalFinalPrice.toInt())}원',
-              ),
-              _buildPrintPreviewInfoChip('생성일시', _formatDateTime(generatedAt)),
-              if (isSplitLayout)
-                _buildPrintPreviewInfoChip(
-                  '레이아웃',
-                  '$_printPreviewSplitThreshold행 초과로 좌/우 분할',
-                ),
             ],
           ),
         ],
@@ -2207,17 +2183,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? currentCalculations.sublist(splitIndex)
         : const <CalculationItem>[];
 
-    final String lengthRangeText;
-    if (currentCalculations.isEmpty) {
-      lengthRangeText = '-';
-    } else {
-      final minLength = currentCalculations.first.length;
-      final maxLength = currentCalculations.last.length;
-      lengthRangeText = minLength == maxLength
-          ? '$minLength칸'
-          : '$minLength칸 ~ $maxLength칸';
-    }
-
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -2251,12 +2216,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     selectedRod: selectedRod,
                     brandName: brand.name,
                     calculationMode: calculationMode,
-                    dataRowCount: currentCalculations.length,
-                    lengthRangeText: lengthRangeText,
-                    totalQuantity: totalQuantity,
-                    totalFinalPrice: totalFinalPrice,
-                    generatedAt: generatedAt,
-                    isSplitLayout: effectiveSplitLayout,
                   ),
                   const SizedBox(height: 12),
 
