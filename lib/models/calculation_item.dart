@@ -14,7 +14,7 @@ class CalculationItem with _$CalculationItem {
     required int length,
     required int quantity,
     required double discountRate, // 매입 적용율
-    @Default(1.0) double saleRate, // 판매 적용율
+    @Default(0.7) double saleRate, // 판매 적용율
   }) = _CalculationItem;
 
   factory CalculationItem.fromJson(Map<String, dynamic> json) =>

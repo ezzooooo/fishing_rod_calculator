@@ -33,7 +33,7 @@ class CalculationNotifier extends StateNotifier<List<CalculationItem>> {
     );
 
     final resolvedPurchaseRate = discountRate ?? 0.7;
-    final resolvedSaleRate = saleRate ?? 1.0;
+    final resolvedSaleRate = saleRate ?? 0.7;
 
     if (existingIndex != -1) {
       final existingItem = state[existingIndex];

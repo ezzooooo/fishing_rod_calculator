@@ -113,27 +113,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return _priceForMode(rod, length, ref.read(calculationModeProvider));
   }
 
-  List<double> _rateOptionsForMode(CalculationMode mode) {
-    if (mode == CalculationMode.sale) {
-      return const [
-        0.4,
-        0.45,
-        0.5,
-        0.55,
-        0.6,
-        0.65,
-        0.7,
-        0.75,
-        0.8,
-        0.85,
-        0.9,
-        0.95,
-        1.0,
-      ];
-    }
-
-    return const [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7];
-  }
+  static const _rateOptions = [
+    0.4,
+    0.45,
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    1.0,
+  ];
 
   double _rateForMode(CalculationItem item, CalculationMode mode) {
     return item.getRateForMode(
@@ -1067,22 +1061,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                                         color: Colors
                                                                             .black87,
                                                                       ),
-                                                                      items:
-                                                                          _rateOptionsForMode(
-                                                                            calculationMode,
-                                                                          ).map((
-                                                                            rate,
-                                                                          ) {
-                                                                            return DropdownMenuItem(
-                                                                              value: rate,
-                                                                              child: Text(
-                                                                                '${(rate * 100).toInt()}%',
-                                                                                style: const TextStyle(
-                                                                                  fontSize: 14,
-                                                                                ),
-                                                                              ),
-                                                                            );
-                                                                          }).toList(),
+                                                                      items: _rateOptions.map((
+                                                                        rate,
+                                                                      ) {
+                                                                        return DropdownMenuItem(
+                                                                          value:
+                                                                              rate,
+                                                                          child: Text(
+                                                                            '${(rate * 100).toInt()}%',
+                                                                            style: const TextStyle(
+                                                                              fontSize: 14,
+                                                                            ),
+                                                                          ),
+                                                                        );
+                                                                      }).toList(),
                                                                       onChanged: (rate) {
                                                                         if (rate !=
                                                                             null) {
@@ -1248,7 +1240,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _showBulkDiscountRateDialog() {
-    double? selectedRate;
+    double selectedRate = 0.7;
     final calculationMode = ref.read(calculationModeProvider);
 
     showDialog(
@@ -1270,13 +1262,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   border: OutlineInputBorder(),
                 ),
                 initialValue: selectedRate,
-                items: _rateOptionsForMode(calculationMode).map((rate) {
+                items: _rateOptions.map((rate) {
                   return DropdownMenuItem(
                     value: rate,
                     child: Text('${(rate * 100).toInt()}%'),
                   );
                 }).toList(),
                 onChanged: (rate) {
+                  if (rate == null) return;
                   setState(() {
                     selectedRate = rate;
                   });
@@ -1290,39 +1283,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: const Text('취소'),
             ),
             TextButton(
-              onPressed: selectedRate == null
-                  ? null
-                  : () {
-                      // 선택된 낚시대의 모든 계산 항목에 적용율 적용
-                      final currentCalculations = ref
-                          .read(calculationProvider)
-                          .where((c) => c.fishingRodId == _selectedRod!.id)
-                          .toList();
+              onPressed: () {
+                // 선택된 낚시대의 모든 계산 항목에 적용율 적용
+                final currentCalculations = ref
+                    .read(calculationProvider)
+                    .where((c) => c.fishingRodId == _selectedRod!.id)
+                    .toList();
 
-                      for (final calculation in currentCalculations) {
-                        ref
-                            .read(calculationProvider.notifier)
-                            .updateDiscountRate(
-                              _selectedRod!.id,
-                              calculation.length,
-                              selectedRate!,
-                              mode: calculationMode,
-                            );
-                      }
-
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '모든 칸수에 ${(selectedRate! * 100).toInt()}% 적용율이 적용되었습니다',
-                          ),
-                          backgroundColor: Colors.green,
-                        ),
+                for (final calculation in currentCalculations) {
+                  ref
+                      .read(calculationProvider.notifier)
+                      .updateDiscountRate(
+                        _selectedRod!.id,
+                        calculation.length,
+                        selectedRate,
+                        mode: calculationMode,
                       );
-                    },
-              style: TextButton.styleFrom(
-                foregroundColor: selectedRate == null ? null : Colors.blue,
-              ),
+                }
+
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '모든 칸수에 ${(selectedRate * 100).toInt()}% 적용율이 적용되었습니다',
+                    ),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.blue),
               child: const Text('적용'),
             ),
           ],

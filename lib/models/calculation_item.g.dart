@@ -13,7 +13,7 @@ _$CalculationItemImpl _$$CalculationItemImplFromJson(
   length: (json['length'] as num).toInt(),
   quantity: (json['quantity'] as num).toInt(),
   discountRate: (json['discountRate'] as num).toDouble(),
-  saleRate: (json['saleRate'] as num?)?.toDouble() ?? 1.0,
+  saleRate: (json['saleRate'] as num?)?.toDouble() ?? 0.7,
 );
 
 Map<String, dynamic> _$$CalculationItemImplToJson(

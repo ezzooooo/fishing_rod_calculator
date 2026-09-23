@@ -175,7 +175,7 @@ class _$CalculationItemImpl extends _CalculationItem {
     required this.length,
     required this.quantity,
     required this.discountRate,
-    this.saleRate = 1.0,
+    this.saleRate = 0.7,
   }) : super._();
 
   factory _$CalculationItemImpl.fromJson(Map<String, dynamic> json) =>
