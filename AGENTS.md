@@ -1,20 +1,42 @@
 # AGENTS.md
 
+## Application
+
+- This is a Next.js App Router / React / TypeScript / Tailwind CSS application.
+- Match the organization of `fishjoongo-renewal`: routes in `src/app`, reusable UI in `src/components`, domain/data helpers in `src/lib`.
+- The previous Flutter project is archived under `legacy/flutter` for comparison and rollback. Do not use Flutter for the active application.
+
+## Firebase
+
+- Keep the existing Firebase Auth project and Firestore collections: `staff`, `brands`, `fishing_rods`, `quote_records`.
+- Only enabled staff can access data. System settings remain restricted to the existing administrator UID.
+- Preserve legacy rod price maps and quote snapshots. Purchase prices round down per unit to 1,000 won; sale prices round up per unit before quantity multiplication.
+- Never replace/import production collections without an explicit user action and a confirmation in the UI.
+- Local configuration is supplied through `.env.local`, `FIREBASE_WEB_API_KEY`, or the existing ignored `.vscode/dart_defines.local.json`. Never print or commit actual local credentials.
+
+## Build and verification
+
+- Use Node.js 22 LTS (22.13+) or Node.js 24 LTS.
+- Install: `npm ci`
+- Develop: `npm run dev`
+- Check: `npm run lint && npm run typecheck && npm test && npm run build`
+- Browser regression: `npm run test:browser` uses development-only in-memory demo data, never production Firebase writes.
+- Keep demo mode disabled in production. The deployment script rejects it.
+
 ## Deployment
 
 - Cloudflare Pages project: `fishjoongo-helper`
 - Production domain: `https://fishjoongo-helper.pages.dev`
 - Production branch: `master`
-- Always deploy with `scripts/deploy_pages.sh`
-- Reason: this disables Flutter's offline-first PWA caching and keeps users on the latest web build
-- The web bootstrap unregisters old service workers and reloads when a newer build is detected
-
-## Build
-
-- Web build command:
-  `flutter build web --release --pwa-strategy=none --dart-define=FIREBASE_WEB_API_KEY=$FIREBASE_WEB_API_KEY`
+- Always deploy with `scripts/deploy_pages.sh`.
+- Next.js uses static export; deploy the `out` directory. Firebase performs authenticated data access in the browser.
+- Do not enable offline-first caching. Keep the Flutter service-worker cleanup so existing users receive the new web app.
+- Runtime document IDs use query parameters on fixed routes (`/quotes/detail?id=...`) because Pages static export cannot prebuild arbitrary Firestore IDs.
 
 ## UI
 
-- For new text inputs, use `AppTextField` or `AppTextFormField` from `lib/widgets/app_text_fields.dart` instead of raw `TextField` or `TextFormField`.
-- Reason: app text inputs select all text on focus, including keyboard Tab navigation.
+- New text inputs must use `Input` / `Textarea` from `src/components/ui.tsx` so mouse and keyboard focus selects all text.
+- Use shared formatters in `src/lib/format.ts`; user-facing dates use `Asia/Seoul`.
+- Design first for laptop viewports at 1280×720 and 1366×768; keep 390px mobile usable too.
+- Use compact horizontal navigation and short panels. Keep totals and the save action visible while editing a quote.
+- Quantity Enter moves to the next length; Ctrl/Cmd+Enter applies the rod group. Keep keyboard focus and select-all behavior intact.
