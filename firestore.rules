@@ -25,6 +25,14 @@ service cloud.firestore {
       allow read, write: if isStaff();
     }
 
+    match /equipment_categories/{categoryId} {
+      allow read, write: if isStaff();
+    }
+
+    match /equipment_products/{productId} {
+      allow read, write: if isStaff();
+    }
+
     match /quote_records/{quoteId} {
       function validQuote() {
         let data = request.resource.data;

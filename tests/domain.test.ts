@@ -20,7 +20,7 @@ import {
   validateQuote,
   type FishingRod,
   type QuoteDraftRod,
-  type QuoteItem,
+  type RodQuoteItem,
   type QuoteRecord,
 } from "../src/lib/domain";
 import { formatAppliedRate, formatDateKey, formatDateTime, formatLengthRange, formatMoney, formatNumber } from "../src/lib/format";
@@ -63,7 +63,7 @@ function record(): QuoteRecord {
   };
 }
 
-function snapshotItem(changes: Partial<QuoteItem> = {}): QuoteItem {
+function snapshotItem(changes: Partial<RodQuoteItem> = {}): RodQuoteItem {
   return {
     fishingRodId: "rod-1",
     fishingRodName: "독야1",
@@ -339,7 +339,7 @@ describe("grouped quote receipt summaries", () => {
     assert.ok(result.includes("18칸 · 1대 · 기준 단가 15,900원 · 최종 단가 10,000원 · 합계 10,000원"));
     assert.ok(result.includes("칸수 범위: 18~20칸\n총 대수: 3대\n총 가격: 47,700원\n평균 적용율: 62.89%\n총 매입가격: 30,000원\n\n[송원] 체어맨 블루"));
     assert.ok(result.includes("전체 합계\n총 대수: 4대\n총 가격: 147,700원\n평균 적용율: 67.7%\n총 매입가격: 100,000원\n총 견적 금액: 100,000원"));
-    assert.ok(result.includes("평균 적용율은 천 원 단위 조정 후 최종 금액 ÷ 총 가격으로 계산합니다."));
+    assert.ok(result.includes("평균 적용율은 저장된 최종 금액 ÷ 총 가격으로 계산합니다."));
     assert.ok(result.includes("고객: 김민수"));
     assert.ok(result.includes("메모: 토요일 방문"));
   });

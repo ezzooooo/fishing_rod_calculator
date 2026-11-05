@@ -7,22 +7,30 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ArrowLeft, Check, ChevronRight, ClipboardCopy, Copy, FileText, History, ImageDown, Plus, Printer, RotateCcw, Search, ShoppingBag, Trash2, Pencil, X } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import { useQuoteDraft } from "@/lib/quote-draft-context";
-import { adjustedUnitPrice, availableLengths, buildQuoteText, groupQuoteItems, modeLabel, priceForLength, quoteItemsFromDraft, quoteSummary, quoteTotals, removeDraftRod, upsertDraftRod, validateQuote, type CalculationMode, type FishingRod, type QuoteDraft, type QuoteDraftRod, type QuoteItem, type QuoteRecord } from "@/lib/domain";
+import { adjustedUnitPrice, availableLengths, buildQuoteText, groupQuoteItems, isEquipmentItem, modeLabel, priceForLength, quoteItemName, quoteItemSpecification, quoteItemUnit, quoteItemsFromDraft, quoteQuantityLabel, quoteSummary, quoteTotals, removeDraftRod, upsertDraftRod, validateQuote, type CalculationMode, type EquipmentQuoteItem, type FishingRod, type QuoteDraft, type QuoteDraftRod, type QuoteItem, type QuoteRecord, type RodQuoteItem } from "@/lib/domain";
 import { formatAppliedRate, formatDateKey, formatDateTime, formatLengthRange, formatMoney } from "@/lib/format";
 import { copyReceiptImage, createReceiptImage, downloadReceiptImage } from "@/lib/receipt-image";
 import { QuoteConflictError } from "@/lib/repository";
 import { Button, EmptyState, Field, Input, Modal, PageHeading, Textarea } from "@/components/ui";
+import { EquipmentPicker } from "@/components/equipment-picker";
 import styles from "./quote-workspace.module.css";
 
 export { QuoteDraftProvider } from "@/lib/quote-draft-context";
 
 const rateOptions = [.4, .45, .5, .55, .6, .65, .7, .75, .8, .85, .9, .95, 1];
-const rateLabel = (rate: number) => `${Number((rate * 100).toFixed(4))}%`;
-const rodLabel = (item: QuoteItem) => `${item.brandName ? `[${item.brandName}] ` : ""}${item.fishingRodName}`;
+const rateLabel = (rate: number | null) => rate === null ? "직접 입력" : `${Number((rate * 100).toFixed(4))}%`;
+const rodLabel = (item: QuoteItem) => `${item.brandName ? `[${item.brandName}] ` : ""}${quoteItemName(item)}`;
+const referenceMoney = (price: number | null) => price === null ? "—" : formatMoney(price);
+const specificationLabel = (item: QuoteItem) => isEquipmentItem(item) ? item.specification : quoteItemSpecification(item);
+const configurationLabel = (item: QuoteItem) => isEquipmentItem(item) ? item.components.map(component => `${component.groupName}: ${component.choiceName}${component.quantity === 1 ? "" : ` ×${component.quantity}`}`).join(" · ") : "";
+function ItemConfiguration({ item }: { item: QuoteItem }) {
+  if (!isEquipmentItem(item) || !item.components.length) return null;
+  return <details className={styles.itemConfiguration}><summary>1{item.unit}당 구성 {item.components.length}종</summary><ul>{item.components.map((component, index) => <li key={`${component.groupId}-${component.choiceId}-${index}`}><span>{component.groupName} · {component.choiceName} ×{component.quantity}</span><span>{formatMoney(component.unitPrice * component.quantity)}</span></li>)}</ul></details>;
+}
 const titleForDraft = (draft: QuoteDraft) => {
   const title = draft.customerName.trim()
     ? `${draft.customerName.trim()} ${modeLabel(draft.mode)} 견적`
-    : `${draft.rods[0]?.rod.name ?? "새"}${draft.rods.length > 1 ? ` 외 ${draft.rods.length - 1}종` : ""} ${modeLabel(draft.mode)} 견적`;
+    : `${draft.rods[0]?.rod.name ?? draft.equipment[0]?.productName ?? "새"}${draft.rods.length + draft.equipment.length > 1 ? ` 외 ${draft.rods.length + draft.equipment.length - 1}종` : ""} ${modeLabel(draft.mode)} 견적`;
   return title.length > 120 ? `${title.slice(0, 119)}…` : title;
 };
 
@@ -34,14 +42,16 @@ export function QuoteBuilder() {
   const { brands, rods, catalogLoading, catalogError, retry } = useApp();
   const { draft, setDraft, clearDraft } = useQuoteDraft();
   const [picker, setPicker] = useState<{ group?: QuoteDraftRod } | null>(null);
+  const [equipmentPicker, setEquipmentPicker] = useState<{ item?: EquipmentQuoteItem } | null>(null);
   const [saving, setSaving] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const items = useMemo(() => quoteItemsFromDraft(draft), [draft]);
   const totals = quoteTotals(items);
+  const groupCount = groupQuoteItems(items).length;
   const record: QuoteRecord = { id: "draft", title: titleForDraft(draft), customerName: draft.customerName.trim(), note: draft.note.trim(), mode: draft.mode, items, createdBy: "", createdAt: new Date().toISOString(), updatedAt: null, revision: 0, totalQuantity: totals.totalQuantity, totalPrice: totals.totalPrice };
-  const hasContent = !!(draft.rods.length || draft.customerName.trim() || draft.note.trim());
+  const hasContent = !!(draft.rods.length || draft.equipment.length || draft.customerName.trim() || draft.note.trim());
   return <>
-    <PageHeading title="새 견적 만들기" description="한 고객의 낚시대를 모아 전체 금액을 확인하고 저장하세요." action={<div className={styles.actions}><Link className={styles.linkButton} href="/quotes"><History size={16} />견적 내역</Link><Button variant="secondary" onClick={() => hasContent ? setResetOpen(true) : clearDraft()}><RotateCcw size={16} />새로 작성</Button></div>} />
+    <PageHeading title="새 견적 만들기" description="낚시대와 용품을 한 고객의 견적에 담고 한 번에 저장하세요." action={<div className={styles.actions}><Link className={styles.linkButton} href="/quotes"><History size={16} />견적 내역</Link><Button variant="secondary" onClick={() => hasContent ? setResetOpen(true) : clearDraft()}><RotateCcw size={16} />새로 작성</Button></div>} />
     <div className={styles.builderGrid}>
       <div className={styles.builderMain}>
         <section className={`${styles.card} ${styles.customerStrip}`} aria-labelledby="customer-heading">
@@ -51,10 +61,10 @@ export function QuoteBuilder() {
           <Field label="메모 (선택)"><Textarea value={draft.note} maxLength={4000} rows={1} placeholder="상담 내용이나 방문 일정" onChange={event => setDraft(current => ({ ...current, note: event.target.value }))} /></Field>
         </section>
         <section className={styles.basketSection} aria-labelledby="basket-heading">
-          <div className={styles.sectionHeading}><h2 id="basket-heading">담은 낚시대</h2><span className={styles.count}>{draft.rods.length}종</span><Button className={styles.addButton} onClick={() => setPicker({})} disabled={catalogLoading || !rods.length}><Plus size={17} />낚시대 추가</Button></div>
+          <div className={styles.sectionHeading}><h2 id="basket-heading">담은 품목</h2><span className={styles.count}>{groupCount}종</span><div className={`${styles.actions} ${styles.addButton}`}><Button variant="secondary" onClick={() => setEquipmentPicker({})}><Plus size={17} />용품 추가</Button><Button onClick={() => setPicker({})} disabled={catalogLoading || !rods.length}><Plus size={17} />낚시대 추가</Button></div></div>
           {catalogError && <div className={styles.error} role="alert"><span>가격표를 불러오지 못했습니다. 작성 중인 견적은 유지됩니다.</span><Button variant="secondary" onClick={retry}>가격표 다시 불러오기</Button></div>}
-          {catalogLoading && !draft.rods.length ? <div className={styles.card}>가격표를 불러오는 중입니다…</div> : !draft.rods.length ? <div className={styles.card}><EmptyState title={rods.length ? "아직 담은 낚시대가 없습니다" : "등록된 낚시대가 없습니다"} description={rods.length ? "낚시대 추가를 눌러 종류와 칸수별 수량을 담아보세요." : "브랜드와 낚시대를 먼저 등록해주세요."} action={rods.length ? <Button onClick={() => setPicker({})}><Plus size={16} />첫 낚시대 담기</Button> : <Link className={styles.linkButton} href="/fishing-rods">낚시대 관리로 이동<ChevronRight size={16} /></Link>} /></div> : draft.rods.map(group => {
-            const groupItems = quoteItemsFromDraft({ ...draft, rods: [group] });
+          {catalogLoading && !items.length ? <div className={styles.card}>가격표를 불러오는 중입니다…</div> : !items.length ? <div className={styles.card}><EmptyState title="아직 담은 품목이 없습니다" description="낚시대는 칸수별로, 텐트·좌대·받침틀은 구성품을 골라 담으세요." action={<div className={styles.actions}>{!!rods.length && <Button onClick={() => setPicker({})}><Plus size={16} />첫 낚시대 담기</Button>}<Button variant="secondary" onClick={() => setEquipmentPicker({})}>용품 직접 추가</Button></div>} /></div> : draft.rods.map(group => {
+            const groupItems = quoteItemsFromDraft({ ...draft, rods: [group], equipment: [] }).filter((item): item is RodQuoteItem => !isEquipmentItem(item));
             const subtotal = quoteTotals(groupItems);
             return <article className={`${styles.card} ${styles.rodCard}`} key={group.rod.id} data-testid={`draft-rod-${group.rod.id}`}>
               <div className={styles.rodHeading}>
@@ -71,21 +81,27 @@ export function QuoteBuilder() {
               </div>)}</div>
             </article>;
           })}
+          {draft.equipment.map(item => <article className={`${styles.card} ${styles.rodCard}`} key={item.id} data-testid={`draft-equipment-${item.id}`}>
+            <div className={styles.rodHeading}><h3><span className={styles.brand}>{item.categoryName || "용품"}</span>{item.productName}<span className={styles.groupQuantity}>{item.quantity}{item.unit}</span></h3><strong className={styles.groupSubtotal}>{formatMoney(item.finalUnitPrice * item.quantity)}</strong><div className={styles.actions}><Button variant="ghost" aria-label={`${item.productName} 용품 수정`} onClick={() => setEquipmentPicker({ item })}><Pencil size={16}/></Button><Button variant="ghost" aria-label={`${item.productName} 용품 빼기`} onClick={() => setDraft(current => ({ ...current, equipment: current.equipment.filter(value => value.id !== item.id) }))}><X size={17}/></Button></div></div>
+            <div className={styles.equipmentDraftLine}><div><strong>{item.specification || "기본 규격"} · {item.quantity}{item.unit}</strong><span>{item.brandName || "브랜드 미지정"}</span></div><span>기준 {referenceMoney(item.unitPrice)}</span><span>{item.pricingMode === "direct" ? "직접 입력" : rateLabel(item.rate)}</span><strong>단가 {formatMoney(item.finalUnitPrice)}</strong></div>
+            {!!item.components.length && <div className={styles.equipmentDraftConfiguration}><ItemConfiguration item={item}/></div>}
+          </article>)}
         </section>
       </div>
       <aside className={`${styles.card} ${styles.summary}`} aria-label="견적 합계">
         <h2>견적 합계</h2>
-        <div className={styles.summaryMeta}><span className={styles.badge}>{modeLabel(draft.mode)} 견적</span><span>{draft.rods.length}종 · 총 {totals.totalQuantity}대</span></div>
+        <div className={styles.summaryMeta}><span className={styles.badge}>{modeLabel(draft.mode)} 견적</span><span>{groupCount}종 · {quoteQuantityLabel(items)}</span></div>
         <strong className={styles.grandTotal} data-testid="quote-total">{formatMoney(totals.totalPrice)}</strong>
-        <div className={styles.summaryOriginal}><span>기준 합계</span><span>{formatMoney(totals.totalOriginalPrice)}</span></div>
-        <p className={styles.summaryHelp}>{items.length ? "담은 낚시대 전체가 한 건의 견적으로 저장됩니다." : "낚시대를 담으면 전체 금액을 확인할 수 있습니다."}</p>
+        <div className={styles.summaryOriginal}><span>기준 합계</span><span>{referenceMoney(totals.totalOriginalPrice)}</span></div>
+        <p className={styles.summaryHelp}>{totals.totalOriginalPrice === null ? "기준가가 없는 품목이 포함되어 기준 합계와 평균 적용율은 표시하지 않습니다." : items.length ? "담은 품목 전체가 한 건의 견적으로 저장됩니다." : "품목을 담으면 전체 금액을 확인할 수 있습니다."}</p>
         {!!items.length && <QuoteActions record={record} />}
       </aside>
     </div>
-    <div className={styles.saveBar} data-testid="quote-save-bar"><div><span>{draft.customerName.trim() ? `${draft.customerName.trim()} · ` : ""}총 {draft.rods.length}종 · {totals.totalQuantity}대</span><strong>{formatMoney(totals.totalPrice)}</strong></div><Button onClick={() => setSaving(true)} disabled={!items.length}><FileText size={17} />견적 저장</Button></div>
+    <div className={styles.saveBar} data-testid="quote-save-bar"><div><span>{draft.customerName.trim() ? `${draft.customerName.trim()} · ` : ""}{groupCount}종 · {quoteQuantityLabel(items)}</span><strong>{formatMoney(totals.totalPrice)}</strong></div><Button onClick={() => setSaving(true)} disabled={!items.length}><FileText size={17} />견적 저장</Button></div>
     {picker && <RodPicker mode={draft.mode} rods={rods} brands={brands} groups={draft.rods} initial={picker.group} onClose={() => setPicker(null)} onApply={group => { setDraft(current => upsertDraftRod(picker.group && picker.group.rod.id !== group.rod.id ? removeDraftRod(current, picker.group.rod.id) : current, group)); setPicker(null); }} />}
     {saving && <SaveQuote record={record} onClose={() => setSaving(false)} onSaved={clearDraft} />}
-    {resetOpen && <Modal title="새 견적을 작성할까요?" onClose={() => setResetOpen(false)} footer={<><Button variant="secondary" onClick={() => setResetOpen(false)}>계속 작성</Button><Button onClick={() => { clearDraft(); setResetOpen(false); }}>새로 작성</Button></>}><p>작성 중인 고객 정보와 담은 낚시대를 비웁니다.</p></Modal>}
+    {equipmentPicker && <EquipmentPicker mode={draft.mode} initial={equipmentPicker.item} onClose={() => setEquipmentPicker(null)} onApply={item => { setDraft(current => ({ ...current, equipment: equipmentPicker.item ? current.equipment.map(value => value.id === equipmentPicker.item?.id ? item : value) : [...current.equipment, item] })); setEquipmentPicker(null); }} />}
+    {resetOpen && <Modal title="새 견적을 작성할까요?" onClose={() => setResetOpen(false)} footer={<><Button variant="secondary" onClick={() => setResetOpen(false)}>계속 작성</Button><Button onClick={() => { clearDraft(); setResetOpen(false); }}>새로 작성</Button></>}><p>작성 중인 고객 정보와 담은 품목을 비웁니다.</p></Modal>}
   </>;
 }
 
@@ -160,9 +176,9 @@ function SaveQuote({ record, onClose, onSaved }: { record: QuoteRecord; onClose:
       onSaved(); onClose(); notify("견적을 저장했습니다.", "success"); router.push(`/quotes/detail?id=${encodeURIComponent(id)}`);
     } catch (failure) { setError(failure instanceof Error ? failure.message : "견적을 저장하지 못했습니다. 다시 시도해주세요."); setBusy(false); }
   }
-  const rodCount = new Set(record.items.map(item => item.fishingRodId)).size;
+  const rodCount = groupQuoteItems(record.items).length;
   return <Modal title="견적 저장" onClose={busy ? undefined : onClose} footer={<><Button variant="secondary" disabled={busy} onClick={onClose}>취소</Button><Button type="submit" form="save-quote" disabled={busy}>{busy ? "저장 중…" : "저장"}</Button></>}>
-    <form id="save-quote" onSubmit={save}><div className={styles.saveOverview}><span>{modeLabel(record.mode)} · {rodCount}종 · {record.totalQuantity}대</span><strong>{formatMoney(record.totalPrice)}</strong>{record.customerName && <p>고객 {record.customerName}</p>}</div><p className={styles.intro}>담은 낚시대 전체를 한 건의 견적으로 기록합니다.</p><Field label="견적 제목"><Input autoFocus value={title} onChange={event => setTitle(event.target.value)} maxLength={120} required /></Field><Field label="메모 (선택)"><Textarea value={note} onChange={event => setNote(event.target.value)} maxLength={4000} rows={3} /></Field>{error && <div className={styles.error} role="alert">{error}</div>}</form>
+    <form id="save-quote" onSubmit={save}><div className={styles.saveOverview}><span>{modeLabel(record.mode)} · {rodCount}종 · {quoteQuantityLabel(record.items)}</span><strong>{formatMoney(record.totalPrice)}</strong>{record.customerName && <p>고객 {record.customerName}</p>}</div><p className={styles.intro}>낚시대와 용품의 선택 구성·가격을 한 건의 견적으로 기록합니다.</p><Field label="견적 제목"><Input autoFocus value={title} onChange={event => setTitle(event.target.value)} maxLength={120} required /></Field><Field label="메모 (선택)"><Textarea value={note} onChange={event => setNote(event.target.value)} maxLength={4000} rows={3} /></Field>{error && <div className={styles.error} role="alert">{error}</div>}</form>
   </Modal>;
 }
 
@@ -243,11 +259,11 @@ function QuoteActions({ record }: { record: QuoteRecord }) {
   </Modal>}</>;
 }
 
-function PriceSummary({ summary, mode, total = false, receipt = false, lengthRange }: { summary: ReturnType<typeof quoteSummary>; mode: CalculationMode; total?: boolean; receipt?: boolean; lengthRange?: string }) {
+function PriceSummary({ summary, mode, total = false, receipt = false, lengthRange, rangeCaption = "칸수 범위", quantityText, quantityCaption = "총 대수" }: { summary: ReturnType<typeof quoteSummary>; mode: CalculationMode; total?: boolean; receipt?: boolean; lengthRange?: string; rangeCaption?: string; quantityText?: string; quantityCaption?: string }) {
   return <dl className={`${styles.priceSummary} ${total ? styles.priceSummaryTotal : ""} ${receipt ? styles.receiptSummary : ""} ${receipt && !lengthRange ? styles.receiptOverallSummary : ""}`}>
-    {lengthRange && <div><dt>칸수 범위</dt><dd>{lengthRange}</dd></div>}
-    {receipt && <div><dt>총 대수</dt><dd>{summary.totalQuantity}대</dd></div>}
-    <div><dt>총 가격</dt><dd>{formatMoney(summary.totalOriginalPrice)}</dd></div>
+    {lengthRange && <div><dt>{rangeCaption}</dt><dd>{lengthRange}</dd></div>}
+    {receipt && <div><dt>{quantityCaption}</dt><dd>{quantityText ?? `${summary.totalQuantity}대`}</dd></div>}
+    <div><dt>총 가격</dt><dd>{referenceMoney(summary.totalOriginalPrice)}</dd></div>
     <div><dt>평균 적용율</dt><dd>{formatAppliedRate(summary.appliedRate)}</dd></div>
     <div><dt>{receipt ? "총 " : ""}{modeLabel(mode)}가격</dt><dd>{formatMoney(summary.totalPrice)}</dd></div>
   </dl>;
@@ -260,13 +276,18 @@ function Receipt({ record }: { record: QuoteRecord }) {
     <div className={styles.receiptBrand}><Image src="/songsan-logo.png" alt="송산 로고" width={32} height={32}/><span>송산중고낚시</span></div>
     <h2>{record.title}</h2>
     <div className={styles.receiptMeta}><span>{modeLabel(record.mode)} 견적{record.customerName ? ` · 고객 ${record.customerName}` : ""}</span><span>{formatDateTime(record.createdAt)}</span></div>
-    <div className={styles.receiptGroups}>{groups.map(group => <section className={styles.receiptGroup} key={group.key} aria-label={`${rodLabel(group.items[0])} 견적`}>
-      <div className={styles.receiptGroupHeading}><h3>{rodLabel(group.items[0])}</h3></div>
-      <div className={styles.receiptTable}><table><thead><tr><th scope="col">칸수</th><th scope="col">수량</th><th scope="col">기준 단가</th><th scope="col">적용율</th><th scope="col">{modeLabel(record.mode)} 단가</th><th scope="col">{modeLabel(record.mode)}금액</th></tr></thead><tbody>{group.items.map((item, index) => <tr key={`${item.length}-${index}`}><th scope="row">{item.length}칸</th><td>{item.quantity}대</td><td>{formatMoney(item.unitPrice)}</td><td>{rateLabel(item.rate)}</td><td>{formatMoney(item.finalUnitPrice)}</td><td>{formatMoney(item.finalUnitPrice * item.quantity)}</td></tr>)}</tbody></table></div>
-      <PriceSummary summary={group} mode={record.mode} receipt lengthRange={formatLengthRange(group.items.map(item => item.length))} />
-    </section>)}</div>
-    <section className={styles.receiptGrandTotal} aria-label="전체 합계"><div className={styles.receiptGroupHeading}><h3>전체 합계</h3></div><PriceSummary summary={summary} mode={record.mode} total receipt /></section>
-    <p className={styles.receiptHelp}>총 가격은 비율 적용 전 기준 합계입니다. 평균 적용율은 {modeLabel(record.mode)}가격 ÷ 총 가격 × 100으로, 천 원 단위 조정을 반영합니다.</p>
+    <div className={styles.receiptGroups}>{groups.map(group => {
+      const equipment = isEquipmentItem(group.items[0]);
+      const specifications = [...new Set(group.items.map(specificationLabel).filter(Boolean))].join(" / ");
+      const range = equipment ? specifications || "기본 규격" : formatLengthRange(group.items.filter((item): item is RodQuoteItem => !isEquipmentItem(item)).map(item => item.length));
+      return <section className={styles.receiptGroup} key={group.key} aria-label={`${rodLabel(group.items[0])} 견적`}>
+        <div className={styles.receiptGroupHeading}><h3>{rodLabel(group.items[0])}</h3>{equipment && <span>{(group.items[0] as EquipmentQuoteItem).categoryName}</span>}</div>
+        <div className={styles.receiptTable}><table><thead><tr><th scope="col">{equipment ? "규격 / 구성" : "칸수"}</th><th scope="col">수량</th><th scope="col">기준 단가</th><th scope="col">적용율</th><th scope="col">{modeLabel(record.mode)} 단가</th><th scope="col">{modeLabel(record.mode)}금액</th></tr></thead><tbody>{group.items.map((item, index) => <tr key={index}><th scope="row">{specificationLabel(item) || "기본 규격"}{isEquipmentItem(item) && !!item.components.length && <small className={styles.receiptComponents}>1{item.unit}당 구성 · {configurationLabel(item)}</small>}</th><td>{item.quantity}{quoteItemUnit(item)}</td><td>{referenceMoney(item.unitPrice)}</td><td>{rateLabel(item.rate)}</td><td>{formatMoney(item.finalUnitPrice)}</td><td>{formatMoney(item.finalUnitPrice * item.quantity)}</td></tr>)}</tbody></table></div>
+        <PriceSummary summary={group} mode={record.mode} receipt lengthRange={range} rangeCaption={equipment ? "규격" : "칸수 범위"} quantityText={quoteQuantityLabel(group.items)} quantityCaption={equipment ? "총 수량" : "총 대수"}/>
+      </section>;
+    })}</div>
+    <section className={styles.receiptGrandTotal} aria-label="전체 합계"><div className={styles.receiptGroupHeading}><h3>전체 합계</h3></div><PriceSummary summary={summary} mode={record.mode} total receipt quantityText={quoteQuantityLabel(record.items)} quantityCaption={record.items.some(isEquipmentItem) ? "총 수량" : "총 대수"}/></section>
+    <p className={styles.receiptHelp}>{summary.totalOriginalPrice === null ? "기준가가 없는 품목이 포함되어 전체 기준 총액과 평균 적용율은 —로 표시합니다. 최종 견적금액에는 모든 품목이 포함됩니다." : `총 가격은 비율 적용 전 기준 합계입니다. 평균 적용율은 ${modeLabel(record.mode)}가격 ÷ 총 가격 × 100이며, 저장된 최종 단가를 기준으로 계산합니다.`}</p>
     {record.note && <div className={styles.receiptNote}><h3>메모</h3><p>{record.note}</p></div>}
   </section>;
 }
@@ -279,14 +300,14 @@ export function QuoteHistory() {
   useEffect(() => { if (!repository || status !== "authorized") return; return repository.watchQuotes(records => setState({ records, ready: true, error: "" }), error => setState({ records: [], ready: true, error: error.message })); }, [repository, status, attempt]);
   const records = [...state.records].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const query = search.trim().toLocaleLowerCase();
-  const filtered = records.filter(record => [record.title, record.customerName, record.note, modeLabel(record.mode), ...record.items.flatMap(item => [item.fishingRodName, item.brandName, String(item.length)])].join(" ").toLocaleLowerCase().includes(query));
-  return <><PageHeading title="견적 내역" description="기록 당시의 낚시대와 금액을 확인하고, 필요한 내용을 수정하세요." action={<Link className={styles.primaryLink} href="/"><Plus size={17} />새 견적 만들기</Link>} /><div className={`${styles.card} ${styles.historySearchCard}`}><div className={styles.historySearch}><Search size={19} /><Input aria-label="견적 검색" placeholder="고객명, 제목, 메모, 낚시대 또는 브랜드명 검색" value={search} onChange={event => setSearch(event.target.value)} /></div></div>{!state.ready ? <div className={styles.loading}>견적 내역을 불러오는 중입니다…</div> : state.error ? <div className={styles.card}><EmptyState title="견적 내역을 불러오지 못했습니다" description={state.error} action={<Button variant="secondary" onClick={() => { setState({ records: [], ready: false, error: "" }); setAttempt(value => value + 1); }}>다시 시도</Button>} /></div> : !records.length ? <div className={styles.card}><EmptyState title="저장된 견적이 없습니다" description="새 견적 만들기에서 여러 낚시대를 담은 뒤 저장해주세요." action={<Link className={styles.primaryLink} href="/">새 견적 만들기</Link>} /></div> : !filtered.length ? <div className={styles.card}><EmptyState title="검색 결과가 없습니다" description="다른 고객명이나 낚시대 이름으로 검색해주세요." /></div> : <><div className={styles.historyCount}>총 {filtered.length}건 · 최근 기록순</div><div className={styles.historyTable}>
-      <div className={styles.historyTableHead} aria-hidden="true"><span>구분</span><span>견적 / 고객</span><span className={styles.historyRodsColumn}>낚시대</span><span>수량</span><span>견적 금액</span><span>기록 시간</span><span /></div>
+  const filtered = records.filter(record => [record.title, record.customerName, record.note, modeLabel(record.mode), ...record.items.flatMap(item => [quoteItemName(item), item.brandName, specificationLabel(item), configurationLabel(item), isEquipmentItem(item) ? item.categoryName : "낚시대"])].join(" ").toLocaleLowerCase().includes(query));
+  return <><PageHeading title="견적 내역" description="기록 당시의 품목·구성과 금액을 확인하고 필요한 내용을 수정하세요." action={<Link className={styles.primaryLink} href="/"><Plus size={17} />새 견적 만들기</Link>} /><div className={`${styles.card} ${styles.historySearchCard}`}><div className={styles.historySearch}><Search size={19} /><Input aria-label="견적 검색" placeholder="고객명, 제품명, 구성품 또는 브랜드명 검색" value={search} onChange={event => setSearch(event.target.value)} /></div></div>{!state.ready ? <div className={styles.loading}>견적 내역을 불러오는 중입니다…</div> : state.error ? <div className={styles.card}><EmptyState title="견적 내역을 불러오지 못했습니다" description={state.error} action={<Button variant="secondary" onClick={() => { setState({ records: [], ready: false, error: "" }); setAttempt(value => value + 1); }}>다시 시도</Button>} /></div> : !records.length ? <div className={styles.card}><EmptyState title="저장된 견적이 없습니다" description="새 견적 만들기에서 낚시대와 용품을 담은 뒤 저장해주세요." action={<Link className={styles.primaryLink} href="/">새 견적 만들기</Link>} /></div> : !filtered.length ? <div className={styles.card}><EmptyState title="검색 결과가 없습니다" description="다른 고객명이나 낚시대 이름으로 검색해주세요." /></div> : <><div className={styles.historyCount}>총 {filtered.length}건 · 최근 기록순</div><div className={styles.historyTable}>
+      <div className={styles.historyTableHead} aria-hidden="true"><span>구분</span><span>견적 / 고객</span><span className={styles.historyRodsColumn}>품목</span><span>수량</span><span>견적 금액</span><span>기록 시간</span><span /></div>
       {filtered.map(record => <Link key={record.id} href={`/quotes/detail?id=${encodeURIComponent(record.id)}`} className={styles.historyRow}>
         <span className={`${styles.badge} ${record.mode === "sale" ? styles.saleBadge : ""}`}>{modeLabel(record.mode)}</span>
         <div className={styles.historyIdentity}><h2>{record.title}</h2><p>{record.customerName ? `고객 ${record.customerName}` : "고객명 미입력"}</p></div>
         <p className={styles.historyRodsColumn}>{[...new Set(record.items.map(rodLabel))].join(", ")}</p>
-        <span className={styles.historyQuantity}>{new Set(record.items.map(item => item.fishingRodId)).size}종 · {record.totalQuantity}대</span>
+        <span className={styles.historyQuantity}>{groupQuoteItems(record.items).length}종 · {quoteQuantityLabel(record.items)}</span>
         <strong className={styles.historyAmount}>{formatMoney(record.totalPrice)}</strong>
         <div className={styles.historyDates}><span>{formatDateTime(record.createdAt)}</span>{record.updatedAt && <span>수정 {formatDateTime(record.updatedAt)}</span>}</div>
         <ChevronRight className={styles.historyChevron} size={16} />
@@ -308,7 +329,8 @@ function QuoteDetailContent({ id }: { id: string }) {
   const [remote, setRemote] = useState<{ id: string; record: QuoteRecord | null; error: string }>({ id: "", record: null, error: "" });
   const [editing, setEditing] = useState<QuoteRecord | null>(null);
   const [base, setBase] = useState<QuoteRecord | null>(null);
-  const [itemEditor, setItemEditor] = useState<{ index: number; item?: QuoteItem } | null>(null);
+  const [itemEditor, setItemEditor] = useState<{ index: number; item?: RodQuoteItem } | null>(null);
+  const [equipmentEditor, setEquipmentEditor] = useState<{ index: number; item?: EquipmentQuoteItem } | null>(null);
   const [discard, setDiscard] = useState<"cancel" | "leave" | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -365,20 +387,20 @@ function QuoteDetailContent({ id }: { id: string }) {
     <div className={styles.detailGrid}>
       <div className={styles.builderMain}>
         <section className={styles.card}>
-          {editing ? <><Field label="견적 제목"><Input value={record.title} maxLength={120} required onChange={event => setEditing(current => current && ({ ...current, title: event.target.value }))} /></Field><div className={styles.customerGrid}><Field label="고객명 (선택)"><Input value={record.customerName} maxLength={120} onChange={event => setEditing(current => current && ({ ...current, customerName: event.target.value }))} /></Field><Field label="견적 구분"><select className="control" value={record.mode} onChange={event => { const mode = event.target.value as CalculationMode; setEditing(current => current && ({ ...current, mode, items: current.items.map(item => ({ ...item, finalUnitPrice: adjustedUnitPrice(item.unitPrice, item.rate, mode) })) })); }}><option value="purchase">매입</option><option value="sale">판매</option></select></Field></div><p className={styles.help}>견적 구분을 바꾸면 저장된 기준 단가와 적용율로 전체 금액을 다시 계산합니다.</p></> : <><span className={styles.badge}>{modeLabel(record.mode)} 견적</span><h2 className={styles.detailTitle}>{record.title}</h2>{record.customerName && <p className={styles.customerName}>고객 {record.customerName}</p>}</>}
+          {editing ? <><Field label="견적 제목"><Input value={record.title} maxLength={120} required onChange={event => setEditing(current => current && ({ ...current, title: event.target.value }))} /></Field><div className={styles.customerGrid}><Field label="고객명 (선택)"><Input value={record.customerName} maxLength={120} onChange={event => setEditing(current => current && ({ ...current, customerName: event.target.value }))} /></Field><Field label="견적 구분"><select className="control" value={record.mode} onChange={event => { const mode = event.target.value as CalculationMode; setEditing(current => current && ({ ...current, mode, items: current.items.map(item => isEquipmentItem(item) ? item : ({ ...item, finalUnitPrice: adjustedUnitPrice(item.unitPrice, item.rate, mode) })) })); }}><option value="purchase">매입</option><option value="sale">판매</option></select></Field></div><p className={styles.help}>낚시대는 저장된 기준 단가와 적용율로 다시 계산하며, 용품은 입력한 견적금액을 유지합니다.</p></> : <><span className={styles.badge}>{modeLabel(record.mode)} 견적</span><h2 className={styles.detailTitle}>{record.title}</h2>{record.customerName && <p className={styles.customerName}>고객 {record.customerName}</p>}</>}
         </section>
         <section className={styles.detailItemsSection}>
-          <div className={styles.sectionHeading}><h2>견적 항목</h2><span className={styles.count}>{groups.length}종 · {record.items.length}개 항목</span>{editing && <Button className={styles.addButton} variant="secondary" onClick={() => setItemEditor({ index: -1 })} disabled={busy || record.items.length >= 500}><Plus size={16} />항목 추가</Button>}</div>
+          <div className={styles.sectionHeading}><h2>견적 항목</h2><span className={styles.count}>{groups.length}종 · {record.items.length}개 항목</span>{editing && <div className={`${styles.actions} ${styles.addButton}`}><Button variant="secondary" onClick={() => setItemEditor({ index: -1 })} disabled={busy || record.items.length >= 500}><Plus size={16} />낚시대 항목 추가</Button><Button variant="secondary" onClick={() => setEquipmentEditor({ index: -1 })} disabled={busy || record.items.length >= 500}><Plus size={16} />용품 추가</Button></div>}</div>
           {!record.items.length ? <div className={styles.card}><EmptyState title="견적 항목을 추가해주세요" /></div> : <div className={styles.detailTableScroll} role="region" aria-label="견적 항목 표 스크롤" tabIndex={0}>
-            <table className={styles.detailItemsTable} aria-label="견적 항목">
-              <thead><tr><th scope="col">칸수</th><th scope="col">수량</th><th scope="col">기준 단가</th><th scope="col">적용율</th><th scope="col">{modeLabel(record.mode)} 단가</th><th scope="col">{modeLabel(record.mode)}금액</th>{editing && <th scope="col">관리</th>}</tr></thead>
+            <table className={`${styles.detailItemsTable} ${record.items.some(isEquipmentItem) ? styles.mixedItemsTable : ""}`} aria-label="견적 항목">
+              <thead><tr><th scope="col">규격 / 구성</th><th scope="col">수량</th><th scope="col">기준 단가</th><th scope="col">적용율</th><th scope="col">{modeLabel(record.mode)} 단가</th><th scope="col">{modeLabel(record.mode)}금액</th>{editing && <th scope="col">관리</th>}</tr></thead>
               {groups.map(group => <tbody key={group.key} aria-label={`${rodLabel(group.items[0])} 항목`}>
-                <tr className={styles.detailGroupHeading}><th scope="rowgroup" colSpan={editing ? 7 : 6}><div><h3>{rodLabel(group.items[0])}</h3><span>총 {group.totalQuantity}대</span></div></th></tr>
+                <tr className={styles.detailGroupHeading}><th scope="rowgroup" colSpan={editing ? 7 : 6}><div><h3>{isEquipmentItem(group.items[0]) ? `[${group.items[0].categoryName}] ` : ""}{rodLabel(group.items[0])}</h3><span>{quoteQuantityLabel(group.items)}</span></div></th></tr>
                 {group.items.map(item => {
                   const index = record.items.indexOf(item);
                   return <tr key={index}>
-                    <th scope="row">{item.length}칸</th><td>{item.quantity}대</td><td>{formatMoney(item.unitPrice)}</td><td>{rateLabel(item.rate)}</td><td>{formatMoney(item.finalUnitPrice)}</td><td className={styles.detailLineAmount}>{formatMoney(item.finalUnitPrice * item.quantity)}</td>
-                    {editing && <td><div className={styles.detailTableActions}><Button variant="ghost" aria-label={`${item.fishingRodName} ${item.length}칸 항목 수정`} disabled={busy} onClick={() => setItemEditor({ index, item })}><Pencil size={15} /></Button><Button variant="ghost" aria-label={`${item.fishingRodName} ${item.length}칸 항목 삭제`} disabled={busy} onClick={() => setEditing(current => current && ({ ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) }))}><X size={16} /></Button></div></td>}
+                    <th scope="row">{specificationLabel(item) || "기본 규격"}<ItemConfiguration item={item}/></th><td>{item.quantity}{quoteItemUnit(item)}</td><td>{referenceMoney(item.unitPrice)}</td><td>{rateLabel(item.rate)}</td><td>{formatMoney(item.finalUnitPrice)}</td><td className={styles.detailLineAmount}>{formatMoney(item.finalUnitPrice * item.quantity)}</td>
+                    {editing && <td><div className={styles.detailTableActions}><Button variant="ghost" aria-label={`${quoteItemName(item)} ${specificationLabel(item)} 항목 수정`} disabled={busy} onClick={() => isEquipmentItem(item) ? setEquipmentEditor({ index, item }) : setItemEditor({ index, item })}><Pencil size={15} /></Button><Button variant="ghost" aria-label={`${quoteItemName(item)} ${specificationLabel(item)} 항목 삭제`} disabled={busy} onClick={() => setEditing(current => current && ({ ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) }))}><X size={16} /></Button></div></td>}
                   </tr>;
                 })}
                 <tr className={styles.detailGroupSubtotal}><td colSpan={editing ? 7 : 6}><PriceSummary summary={group} mode={record.mode} /></td></tr>
@@ -387,18 +409,19 @@ function QuoteDetailContent({ id }: { id: string }) {
           </div>}
         </section>
         <section className={styles.card}><h2 className={styles.noteHeading}>메모</h2>{editing ? <Textarea aria-label="메모 (선택)" rows={4} maxLength={4000} value={record.note} onChange={event => setEditing(current => current && ({ ...current, note: event.target.value }))} /> : <p className={styles.noteText}>{record.note || "남긴 메모가 없습니다."}</p>}</section>
-        <p className={styles.help}>저장 당시의 낚시대 정보와 가격입니다. 현재 가격표가 변경되거나 낚시대가 삭제되어도 이 견적은 유지됩니다.</p>
+        <p className={styles.help}>저장 당시의 품목·선택 구성과 가격입니다. 제품이나 구성 설정이 변경되어도 기록된 견적은 유지됩니다.</p>
       </div>
-      <aside className={`${styles.card} ${styles.summary}`}><h2>견적 합계</h2><p className={styles.summaryCount}>{groups.length}종 · 총 {totals.totalQuantity}대</p><strong className={styles.grandTotal}>{formatMoney(totals.totalPrice)}</strong><div className={styles.summaryOriginal}><span>총 가격</span><span>{formatMoney(totals.totalOriginalPrice)}</span></div><div className={styles.summaryOriginal}><span>평균 적용율</span><span>{formatAppliedRate(totals.appliedRate)}</span></div>{!editing && <QuoteActions record={displayRecord} />}</aside>
+      <aside className={`${styles.card} ${styles.summary}`}><h2>견적 합계</h2><p className={styles.summaryCount}>{groups.length}종 · {quoteQuantityLabel(record.items)}</p><strong className={styles.grandTotal}>{formatMoney(totals.totalPrice)}</strong><div className={styles.summaryOriginal}><span>총 가격</span><span>{referenceMoney(totals.totalOriginalPrice)}</span></div><div className={styles.summaryOriginal}><span>평균 적용율</span><span>{formatAppliedRate(totals.appliedRate)}</span></div>{!editing && <QuoteActions record={displayRecord} />}</aside>
     </div>
-    {editing && <div className={styles.saveBar}><div><span>총 {totals.totalQuantity}대</span><strong>{formatMoney(totals.totalPrice)}</strong></div><Button disabled={busy} onClick={save}>{busy ? "저장 중…" : "수정 내용 저장"}</Button></div>}
+    {editing && <div className={styles.saveBar}><div><span>{quoteQuantityLabel(record.items)}</span><strong>{formatMoney(totals.totalPrice)}</strong></div><Button disabled={busy} onClick={save}>{busy ? "저장 중…" : "수정 내용 저장"}</Button></div>}
     {itemEditor && editing && <QuoteItemEditor item={itemEditor.item} mode={editing.mode} onClose={() => setItemEditor(null)} onApply={item => { setEditing(current => current && ({ ...current, items: itemEditor.index < 0 ? [...current.items, item] : current.items.map((value, index) => index === itemEditor.index ? item : value) })); setItemEditor(null); }} />}
+    {equipmentEditor && editing && <EquipmentPicker mode={editing.mode} initial={equipmentEditor.item} onClose={() => setEquipmentEditor(null)} onApply={item => { setEditing(current => current && ({ ...current, items: equipmentEditor.index < 0 ? [...current.items, item] : current.items.map((value, index) => index === equipmentEditor.index ? item : value) })); setEquipmentEditor(null); }} />}
     {discard && <Modal title="변경사항을 버릴까요?" onClose={() => setDiscard(null)} footer={<><Button variant="secondary" onClick={() => setDiscard(null)}>계속 수정</Button><Button onClick={() => { const leavePage = discard === "leave"; setEditing(null); setBase(null); setError(""); setDiscard(null); if (leavePage) router.push("/quotes"); }}>변경사항 버리기</Button></>}><p>저장하지 않은 변경사항을 버립니다.</p></Modal>}
     {deleteOpen && <Modal title="견적 삭제" onClose={busy ? undefined : () => setDeleteOpen(false)} footer={<><Button variant="secondary" disabled={busy} onClick={() => setDeleteOpen(false)}>취소</Button><Button variant="danger" disabled={busy} onClick={remove}>{busy ? "삭제 중…" : "삭제"}</Button></>}><p>「{record.title}」 견적을 삭제하시겠습니까? 삭제한 기록은 복구할 수 없습니다.</p></Modal>}
   </>;
 }
 
-function QuoteItemEditor({ item, mode, onClose, onApply }: { item?: QuoteItem; mode: CalculationMode; onClose: () => void; onApply: (item: QuoteItem) => void }) {
+function QuoteItemEditor({ item, mode, onClose, onApply }: { item?: RodQuoteItem; mode: CalculationMode; onClose: () => void; onApply: (item: RodQuoteItem) => void }) {
   const [name, setName] = useState(item?.fishingRodName ?? "");
   const [brand, setBrand] = useState(item?.brandName ?? "");
   const [length, setLength] = useState(String(item?.length ?? ""));

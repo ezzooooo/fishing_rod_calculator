@@ -11,6 +11,10 @@
 - Keep the existing Firebase Auth project and Firestore collections: `staff`, `brands`, `fishing_rods`, `quote_records`.
 - Only enabled staff can access data. System settings remain restricted to the existing administrator UID.
 - Preserve legacy rod price maps and quote snapshots. Purchase prices round down per unit to 1,000 won; sale prices round up per unit before quantity multiplication.
+- Equipment categories/products live in `equipment_categories` / `equipment_products`; only enabled staff can read/write them. Never seed production catalogues automatically.
+- Quote items are a true rod/equipment union. Only rods have a length; use the common item helpers and preserve legacy records without a kind as rods.
+- Equipment option groups and choices are data, not fixed category-specific fields. Keep stable IDs, explicit template merging, and per-quote component/name/price snapshots. Catalogue edits must not reprice existing quotes.
+- Equipment direct prices stay exact: negotiated base plus signed component adjustments per unit, multiplied by item quantity once. Unknown reference prices are null, distinct from zero; incomplete reference totals/rates must display as unknown.
 - Never replace/import production collections without an explicit user action and a confirmation in the UI.
 - Local configuration is supplied through `.env.local`, `FIREBASE_WEB_API_KEY`, or the existing ignored `.vscode/dart_defines.local.json`. Never print or commit actual local credentials.
 

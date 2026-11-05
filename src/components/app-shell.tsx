@@ -10,7 +10,7 @@ import { legacyRouteTarget } from '@/lib/legacy-route';
 import { Button, Field, Input } from './ui';
 import styles from './app-shell.module.css';
 
-const links=[{href:'/',label:'새 견적 만들기',icon:FilePlus2},{href:'/quotes',label:'견적 내역',icon:History},{href:'/brands',label:'브랜드 관리',icon:Building2},{href:'/fishing-rods',label:'낚시대 관리',icon:Fish},{href:'/system-settings',label:'시스템 설정',icon:Settings,admin:true}];
+const links=[{href:'/',label:'새 견적 만들기',icon:FilePlus2},{href:'/quotes',label:'견적 내역',icon:History},{href:'/brands',label:'브랜드 관리',icon:Building2},{href:'/products',label:'제품 관리',icon:Fish},{href:'/system-settings',label:'시스템 설정',icon:Settings,admin:true}];
 function Login(){
   const {signIn}=useApp();const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
   async function submit(event:FormEvent){event.preventDefault();if(busy)return;setBusy(true);setError('');try{await signIn(email,password);}catch{setError('로그인하지 못했습니다. 이메일과 비밀번호를 확인해주세요.');}finally{setBusy(false);}}

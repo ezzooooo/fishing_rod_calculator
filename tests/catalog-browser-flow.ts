@@ -16,7 +16,7 @@ export async function catalogBrowserFlow(page: Page): Promise<void> {
       const expanded = await menu.evaluate((element) => element.closest("details")?.open);
       if (!expanded) await menu.click();
     }
-    await page.getByRole("link", { name, exact: true }).click();
+    await page.getByRole("link", { name: name === "낚시대 관리" ? "제품 관리" : name, exact: true }).click();
     await page.getByRole("heading", { name, level: 1, exact: true }).waitFor();
   }
 

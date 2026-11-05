@@ -5,12 +5,14 @@ import type { Firestore } from "firebase/firestore";
 import { DemoRepository } from "../src/lib/demo-repository";
 import {
   normalizeFishingRod,
+  isEquipmentItem,
   quoteTotals,
   type Brand,
   type FishingRod,
   type QuoteRecord,
 } from "../src/lib/domain";
 import { isDemoMode } from "../src/lib/firebase";
+import { calculateEquipmentQuoteItem, createEquipmentPreset, equipmentOptionSnapshots, type EquipmentCategory, type EquipmentProduct } from "../src/lib/equipment";
 import {
   FirebaseRepository,
   QuoteConflictError,
@@ -76,6 +78,20 @@ function quoteInput(): QuoteInput {
   };
 }
 
+function readEquipmentCategories(repository: AppRepository): Promise<EquipmentCategory[]> {
+  return new Promise((resolve, reject) => {
+    const stop = repository.watchEquipmentCategories(value => { stop(); resolve(value); }, reject);
+  });
+}
+function readEquipmentProducts(repository: AppRepository): Promise<EquipmentProduct[]> {
+  return new Promise((resolve, reject) => {
+    const stop = repository.watchEquipmentProducts(value => { stop(); resolve(value); }, reject);
+  });
+}
+function equipmentProduct(category: EquipmentCategory): EquipmentProduct {
+  return { id: "product-custom", name: "텐트 제품", categoryId: category.id, brandId: "brand-1", specification: "2인용", unit: "동", purchasePrice: null, salePrice: 0, optionGroups: category.optionGroups };
+}
+
 function existingRecord(): QuoteRecord {
   const input = quoteInput();
   return {
@@ -135,6 +151,7 @@ describe("preview repository data compatibility", () => {
     const restored = await readQuote(repository, id);
     assert.ok(restored);
     assert.deepEqual(restored.items, original.items);
+    assert.ok(!isEquipmentItem(restored.items[0]));
     assert.equal(restored.items[0].fishingRodName, "독야1");
     assert.equal(restored.items[0].brandName, "송원");
     assert.equal(restored.totalPrice, 342000);
@@ -194,6 +211,39 @@ describe("preview repository data compatibility", () => {
     assert.equal(await readQuote(repository, original.id), null);
     assert.ok((await readQuotes(repository)).every((value) => value.id !== original.id));
   });
+
+  it("saves editable equipment catalogues and retains independent quote snapshots after deletion", async () => {
+    const repository = new DemoRepository();
+    const category = { ...createEquipmentPreset("tent"), id: "category-custom" };
+    category.optionGroups[0].choices[0].purchasePrice = 250;
+    const product = equipmentProduct(category);
+    await repository.saveEquipmentCategory(category);
+    await repository.saveEquipmentProduct(product);
+    const categories = await readEquipmentCategories(repository);
+    const products = await readEquipmentProducts(repository);
+    assert.ok(categories.some(value => value.id === category.id));
+    assert.equal(products.find(value => value.id === product.id)?.purchasePrice, null);
+    assert.equal(products.find(value => value.id === product.id)?.salePrice, 0);
+    const components = equipmentOptionSnapshots(product.optionGroups, [{ groupId: "fly", choiceId: "long", quantity: 1 }], "purchase");
+    const item = calculateEquipmentQuoteItem({ kind: "equipment", id: "line", categoryId: category.id, categoryName: category.name, productId: product.id, productName: product.name, brandName: "브랜드", specification: product.specification, unit: product.unit, quantity: 2, pricingMode: "direct", baseUnitPrice: null, directUnitPrice: 8500, components, unitPrice: null, rate: null, finalUnitPrice: 0 });
+    const id = await repository.createQuote({ ...quoteInput(), items: [quoteInput().items[0], item] });
+    item.components[0].unitPrice = 999999;
+    await repository.deleteEquipmentProduct(product.id);
+    await repository.deleteEquipmentCategory(category.id);
+    const restored = await readQuote(repository, id);
+    assert.ok(restored);
+    assert.equal(restored.totalPrice, 227500);
+    assert.equal(quoteTotals(restored.items).totalOriginalPrice, null);
+    const saved = restored.items[1];
+    assert.ok(isEquipmentItem(saved));
+    assert.equal(saved.components[0].unitPrice, 250);
+    assert.equal(saved.finalUnitPrice, 8750);
+    assert.equal(saved.productName, "텐트 제품");
+    saved.components[0].choiceName = "독립된 화면 복사";
+    const readAgain = await readQuote(repository, id);
+    assert.ok(readAgain && isEquipmentItem(readAgain.items[1]));
+    assert.equal(readAgain.items[1].components[0].choiceName, "롱플라이");
+  });
 });
 
 describe("Firebase authorization happens before SDK access", () => {
@@ -210,6 +260,13 @@ describe("Firebase authorization happens before SDK access", () => {
       await assert.rejects(repository.createQuote(quoteInput()), authorizationError);
       await assert.rejects(repository.updateQuote(existingRecord()), authorizationError);
       await assert.rejects(repository.deleteQuote("quote-1"), authorizationError);
+      const category = createEquipmentPreset("tent");
+      await assert.rejects(repository.saveEquipmentCategory(category), authorizationError);
+      await assert.rejects(repository.deleteEquipmentCategory(category.id), authorizationError);
+      await assert.rejects(repository.saveEquipmentProduct(equipmentProduct(category)), authorizationError);
+      await assert.rejects(repository.deleteEquipmentProduct("product"), authorizationError);
+      assert.throws(() => repository.watchEquipmentCategories(() => {}, () => {}), authorizationError);
+      assert.throws(() => repository.watchEquipmentProducts(() => {}, () => {}), authorizationError);
     });
   }
 
@@ -237,6 +294,8 @@ describe("Firebase authorization happens before SDK access", () => {
     await assert.rejects(repository.createQuote(quoteInput()), authorizationError);
     await assert.rejects(repository.updateQuote(existingRecord()), authorizationError);
     await assert.rejects(repository.deleteQuote("quote-1"), authorizationError);
+    await assert.rejects(repository.saveEquipmentCategory(createEquipmentPreset("tent")), authorizationError);
+    await assert.rejects(repository.deleteEquipmentProduct("product"), authorizationError);
   });
 });
 

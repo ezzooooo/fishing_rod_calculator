@@ -3,6 +3,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { Building2, ChevronDown, Download, FileJson, Layers3, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import { useApp } from "@/lib/app-context";
+import { useEquipmentCatalog } from "@/lib/equipment-context";
 import { availableLengths, normalizeBrand, normalizeFishingRod, priceForLength, type Brand, type FishingRod, type PriceMap } from "@/lib/domain";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { Button, EmptyState, Field, Input, Modal, PageHeading } from "@/components/ui";
@@ -21,6 +22,7 @@ function ConfirmDelete({ title, description, busy, onClose, onConfirm }: { title
 
 export function BrandManagement() {
   const { brands, rods, repository, notify, catalogLoading, catalogError } = useApp();
+  const { products } = useEquipmentCatalog();
   const [search, setSearch] = useState("");
   const [editor, setEditor] = useState<Brand | "new" | null>(null);
   const [name, setName] = useState("");
@@ -49,14 +51,14 @@ export function BrandManagement() {
     finally { setBusy(false); }
   }
   return <>
-    <PageHeading title="브랜드 관리" description="견적에 사용할 낚시대 브랜드를 관리합니다." action={<Button onClick={() => openEditor("new")} disabled={!repository}><Plus size={17} />브랜드 추가</Button>} />
+    <PageHeading title="브랜드 관리" description="낚시대와 용품에 함께 사용할 브랜드를 관리합니다." action={<Button onClick={() => openEditor("new")} disabled={!repository}><Plus size={17} />브랜드 추가</Button>} />
     <CatalogStatus />
     <section className={styles.panel}>
       <div className={styles.toolbar}><div><strong>등록 브랜드</strong><span>{search ? `${filtered.length} / ${brands.length}` : brands.length}개</span></div><div className={styles.search}><Search size={17} /><Input aria-label="브랜드 검색" type="search" placeholder="브랜드명 검색" value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
-      {filtered.length ? <div className={styles.tableScroll}><table className={`${styles.table} ${styles.brandTable}`}><thead><tr><th>브랜드명</th><th>등록 낚시대</th><th className={styles.optional}>최근 변경</th><th className={styles.actionsHeading}>관리</th></tr></thead><tbody>{filtered.map((brand) => <tr key={brand.id}><td><strong>{brand.name}</strong></td><td>{rods.filter((rod) => rod.brandId === brand.id).length}종</td><td className={`${styles.muted} ${styles.optional}`}>{formatDateTime(brand.updatedAt || brand.createdAt) || "—"}</td><td><div className={styles.actions}><Button variant="ghost" aria-label={`${brand.name} 수정`} disabled={!repository} onClick={() => openEditor(brand)}><Pencil size={15} /><span className={styles.actionLabel}>수정</span></Button><Button variant="ghost" className={styles.dangerAction} aria-label={`${brand.name} 삭제`} disabled={!repository} onClick={() => setDeleting(brand)}><Trash2 size={15} /><span className={styles.srOnly}>삭제</span></Button></div></td></tr>)}</tbody></table></div> : !catalogLoading && !catalogError ? <EmptyState title={search ? "검색 결과가 없습니다" : "등록된 브랜드가 없습니다"} description={search ? "다른 브랜드명으로 검색해주세요." : "브랜드를 등록한 뒤 낚시대 가격표를 추가할 수 있습니다."} /> : null}
+      {filtered.length ? <div className={styles.tableScroll}><table className={`${styles.table} ${styles.brandTable}`}><thead><tr><th>브랜드명</th><th>등록 제품</th><th className={styles.optional}>최근 변경</th><th className={styles.actionsHeading}>관리</th></tr></thead><tbody>{filtered.map((brand) => <tr key={brand.id}><td><strong>{brand.name}</strong></td><td>{rods.filter((rod) => rod.brandId === brand.id).length + products.filter((product) => product.brandId === brand.id).length}종</td><td className={`${styles.muted} ${styles.optional}`}>{formatDateTime(brand.updatedAt || brand.createdAt) || "—"}</td><td><div className={styles.actions}><Button variant="ghost" aria-label={`${brand.name} 수정`} disabled={!repository} onClick={() => openEditor(brand)}><Pencil size={15} /><span className={styles.actionLabel}>수정</span></Button><Button variant="ghost" className={styles.dangerAction} aria-label={`${brand.name} 삭제`} disabled={!repository} onClick={() => setDeleting(brand)}><Trash2 size={15} /><span className={styles.srOnly}>삭제</span></Button></div></td></tr>)}</tbody></table></div> : !catalogLoading && !catalogError ? <EmptyState title={search ? "검색 결과가 없습니다" : "등록된 브랜드가 없습니다"} description={search ? "다른 브랜드명으로 검색해주세요." : "브랜드를 등록한 뒤 낚시대와 용품을 추가할 수 있습니다."} /> : null}
     </section>
     {editor && <Modal title={editor === "new" ? "브랜드 추가" : "브랜드 수정"} onClose={busy ? undefined : () => setEditor(null)} footer={<><Button variant="secondary" disabled={busy} onClick={() => setEditor(null)}>취소</Button><Button type="submit" form="brand-editor" disabled={busy}>{busy ? "저장 중…" : "저장"}</Button></>}><form id="brand-editor" onSubmit={save}><Field label="브랜드명"><Input autoFocus required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} placeholder="브랜드명을 입력하세요" disabled={busy} /></Field>{error && <p className={styles.error} role="alert">{error}</p>}</form></Modal>}
-    {deleting && <ConfirmDelete title="브랜드 삭제" description={`‘${deleting.name}’ 브랜드를 삭제할까요? 이 브랜드의 낚시대 ${rods.filter((rod) => rod.brandId === deleting.id).length}종은 함께 삭제되지 않습니다. 저장된 견적도 유지됩니다.`} busy={busy} onClose={() => setDeleting(null)} onConfirm={remove} />}
+    {deleting && <ConfirmDelete title="브랜드 삭제" description={`‘${deleting.name}’ 브랜드를 삭제할까요? 이 브랜드에 등록된 제품은 함께 삭제되지 않습니다. 저장된 견적도 유지됩니다.`} busy={busy} onClose={() => setDeleting(null)} onConfirm={remove} />}
   </>;
 }
 

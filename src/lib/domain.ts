@@ -1,4 +1,5 @@
 import { formatAppliedRate, formatLengthRange, formatMoney } from "./format";
+import { normalizeEquipmentQuoteItem, validateEquipmentQuoteItem } from "./equipment";
 
 export type CalculationMode = "purchase" | "sale";
 export type PriceMap = Record<string, number>;
@@ -32,7 +33,8 @@ export interface CalculationItem {
   saleRate: number;
 }
 
-export interface QuoteItem {
+export interface RodQuoteItem {
+  kind?: "rod";
   fishingRodId: string;
   fishingRodName: string;
   brandName: string;
@@ -43,15 +45,50 @@ export interface QuoteItem {
   finalUnitPrice: number;
 }
 
+export interface EquipmentComponentSnapshot {
+  groupId: string;
+  groupName: string;
+  choiceId: string;
+  choiceName: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface EquipmentQuoteItem {
+  kind: "equipment";
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  productId: string | null;
+  productName: string;
+  brandName: string;
+  specification: string;
+  unit: string;
+  quantity: number;
+  pricingMode: "direct" | "rate";
+  baseUnitPrice: number | null;
+  directUnitPrice: number;
+  components: EquipmentComponentSnapshot[];
+  unitPrice: number | null;
+  rate: number | null;
+  finalUnitPrice: number;
+}
+
+export type QuoteItem = RodQuoteItem | EquipmentQuoteItem;
+
 export interface QuoteSummary {
   totalQuantity: number;
   totalPrice: number;
-  totalOriginalPrice: number;
+  totalOriginalPrice: number | null;
   appliedRate: number | null;
 }
 
 export interface QuoteItemGroup extends QuoteSummary {
   key: string;
+  kind: "rod" | "equipment";
+  name: string;
+  unit: string;
+  categoryName: string;
   fishingRodId: string;
   fishingRodName: string;
   brandName: string;
@@ -84,6 +121,7 @@ export interface QuoteDraft {
   note: string;
   mode: CalculationMode;
   rods: QuoteDraftRod[];
+  equipment: EquipmentQuoteItem[];
 }
 
 function object(value: unknown): Record<string, unknown> {
@@ -248,7 +286,7 @@ export function adjustedUnitPrice(
 }
 
 export function quoteItemsFromDraft(draft: QuoteDraft): QuoteItem[] {
-  return draft.rods.flatMap((group) =>
+  const rods: RodQuoteItem[] = draft.rods.flatMap((group) =>
     group.calculations.filter((calculation) => calculation.quantity > 0).map((calculation) => {
       const unitPrice = priceForLength(group.rod, calculation.length, draft.mode);
       const rate = rateForMode(calculation, draft.mode);
@@ -264,18 +302,20 @@ export function quoteItemsFromDraft(draft: QuoteDraft): QuoteItem[] {
       };
     }),
   );
+  return [...rods, ...(draft.equipment ?? []).map(item => ({ ...item, components: item.components.map(component => ({ ...component })) }))];
 }
 
 export function quoteTotals(items: QuoteItem[]): {
   totalQuantity: number;
   totalPrice: number;
-  totalOriginalPrice: number;
+  totalOriginalPrice: number | null;
 } {
-  return items.reduce(
+  return items.reduce<{ totalQuantity: number; totalPrice: number; totalOriginalPrice: number | null }>(
     (totals, item) => ({
       totalQuantity: totals.totalQuantity + item.quantity,
       totalPrice: totals.totalPrice + item.finalUnitPrice * item.quantity,
-      totalOriginalPrice: totals.totalOriginalPrice + item.unitPrice * item.quantity,
+      totalOriginalPrice: totals.totalOriginalPrice === null || item.unitPrice === null
+        ? null : totals.totalOriginalPrice + item.unitPrice * item.quantity,
     }),
     { totalQuantity: 0, totalPrice: 0, totalOriginalPrice: 0 },
   );
@@ -286,7 +326,7 @@ export function quoteSummary(items: QuoteItem[]): QuoteSummary {
   const totals = quoteTotals(items);
   return {
     ...totals,
-    appliedRate: totals.totalOriginalPrice === 0
+    appliedRate: totals.totalOriginalPrice === null || totals.totalOriginalPrice === 0
       ? null
       : totals.totalPrice / totals.totalOriginalPrice,
   };
@@ -296,15 +336,22 @@ export function quoteSummary(items: QuoteItem[]): QuoteSummary {
 export function groupQuoteItems(items: QuoteItem[]): QuoteItemGroup[] {
   const groups = new Map<string, Omit<QuoteItemGroup, keyof QuoteSummary>>();
   for (const item of items) {
-    const key = JSON.stringify(item.fishingRodId
-      ? ["id", item.fishingRodId, item.brandName, item.fishingRodName]
-      : ["snapshot", item.brandName, item.fishingRodName]);
+    const equipment = isEquipmentItem(item);
+    const itemName = quoteItemName(item);
+    const itemId = equipment ? item.productId ?? item.id : item.fishingRodId;
+    const key = JSON.stringify(equipment
+      ? ["equipment", item.categoryId, item.categoryName, itemId, item.brandName, itemName, item.unit]
+      : itemId ? ["id", itemId, item.brandName, itemName] : ["snapshot", item.brandName, itemName]);
     let group = groups.get(key);
     if (!group) {
       group = {
         key,
-        fishingRodId: item.fishingRodId,
-        fishingRodName: item.fishingRodName,
+        kind: equipment ? "equipment" : "rod",
+        name: itemName,
+        unit: quoteItemUnit(item),
+        categoryName: equipment ? item.categoryName : "낚시대",
+        fishingRodId: itemId,
+        fishingRodName: itemName,
         brandName: item.brandName,
         items: [],
       };
@@ -313,6 +360,28 @@ export function groupQuoteItems(items: QuoteItem[]): QuoteItemGroup[] {
     group.items.push(item);
   }
   return [...groups.values()].map((group) => ({ ...group, ...quoteSummary(group.items) }));
+}
+
+export function isEquipmentItem(item: QuoteItem): item is EquipmentQuoteItem {
+  return item.kind === "equipment";
+}
+export function quoteItemName(item: QuoteItem): string {
+  return isEquipmentItem(item) ? item.productName : item.fishingRodName;
+}
+export function quoteItemUnit(item: QuoteItem): string {
+  return isEquipmentItem(item) ? item.unit : "대";
+}
+export function quoteItemSpecification(item: QuoteItem): string {
+  if (!isEquipmentItem(item)) return `${item.length}칸`;
+  return [item.specification, ...item.components.map(component => `${component.groupName}: ${component.choiceName}${component.quantity > 1 ? ` ×${component.quantity}` : ""}`)].filter(Boolean).join(" · ");
+}
+export function quoteQuantityLabel(items: QuoteItem[]): string {
+  const units = new Map<string, number>();
+  for (const item of items) {
+    const unit = quoteItemUnit(item);
+    units.set(unit, (units.get(unit) ?? 0) + item.quantity);
+  }
+  return [...units].map(([unit, quantity]) => `${quantity}${unit}`).join(" · ") || "0개";
 }
 
 export function normalizeQuoteRecord(
@@ -327,6 +396,8 @@ export function normalizeQuoteRecord(
   if (!Array.isArray(raw.items)) throw new Error("견적 항목이 올바르지 않습니다.");
   const items = raw.items.map((value): QuoteItem => {
     const item = object(value);
+    if (item.kind === "equipment") return normalizeEquipmentQuoteItem(item);
+    if (item.kind !== undefined && item.kind !== "rod") throw new Error("견적 품목 종류가 올바르지 않습니다.");
     return {
       fishingRodId: text(item.fishingRodId),
       fishingRodName: text(item.fishingRodName),
@@ -357,7 +428,7 @@ export function normalizeQuoteRecord(
 }
 
 export function emptyDraft(): QuoteDraft {
-  return { customerName: "", note: "", mode: "purchase", rods: [] };
+  return { customerName: "", note: "", mode: "purchase", rods: [], equipment: [] };
 }
 
 export function upsertDraftRod(draft: QuoteDraft, group: QuoteDraftRod): QuoteDraft {
@@ -395,6 +466,7 @@ export function validateQuote(
     throw new Error("견적 항목을 1~500개 입력해주세요.");
   }
   for (const item of input.items) {
+    if (isEquipmentItem(item)) { validateEquipmentQuoteItem(item); continue; }
     if (!item.fishingRodName.trim() || !Number.isSafeInteger(item.length) || item.length <= 0 ||
       !Number.isSafeInteger(item.quantity) || item.quantity <= 0 ||
       !Number.isFinite(item.unitPrice) || item.unitPrice < 0 ||
@@ -405,16 +477,16 @@ export function validateQuote(
     }
   }
   const totals = quoteTotals(input.items);
-  if (!Number.isSafeInteger(totals.totalQuantity) || !Number.isFinite(totals.totalPrice)) {
+  if (!Number.isSafeInteger(totals.totalQuantity) || !Number.isFinite(totals.totalPrice) || totals.totalOriginalPrice !== null && !Number.isFinite(totals.totalOriginalPrice)) {
     throw new Error("견적 수량과 합계가 너무 큽니다.");
   }
 }
 
 export function buildQuoteText(record: QuoteRecord): string {
   const priceLabel = record.mode === "purchase" ? "총 매입가격" : "총 판매가격";
+  const money = (value: number | null) => value === null ? "—" : formatMoney(value);
   const summaryLines = (summary: QuoteSummary) => [
-    `총 대수: ${summary.totalQuantity}대`,
-    `총 가격: ${formatMoney(summary.totalOriginalPrice)}`,
+    `총 가격: ${money(summary.totalOriginalPrice)}`,
     `평균 적용율: ${formatAppliedRate(summary.appliedRate)}`,
     `${priceLabel}: ${formatMoney(summary.totalPrice)}`,
   ];
@@ -423,13 +495,14 @@ export function buildQuoteText(record: QuoteRecord): string {
   for (const group of groupQuoteItems(record.items)) {
     lines.push("", `${group.brandName ? `[${group.brandName}] ` : ""}${group.fishingRodName}`);
     for (const item of group.items) {
-      lines.push(`${item.length}칸 · ${item.quantity}대 · 기준 단가 ${formatMoney(item.unitPrice)} · 최종 단가 ${formatMoney(item.finalUnitPrice)} · 합계 ${formatMoney(item.finalUnitPrice * item.quantity)}`);
+      lines.push(`${quoteItemSpecification(item) || "본품"} · ${item.quantity}${quoteItemUnit(item)} · 기준 단가 ${money(item.unitPrice)} · 최종 단가 ${formatMoney(item.finalUnitPrice)} · 합계 ${formatMoney(item.finalUnitPrice * item.quantity)}`);
     }
-    lines.push(`칸수 범위: ${formatLengthRange(group.items.map((item) => item.length))}`, ...summaryLines(group));
+    if (group.kind === "rod") lines.push(`칸수 범위: ${formatLengthRange(group.items.filter((item): item is RodQuoteItem => !isEquipmentItem(item)).map(item => item.length))}`);
+    lines.push(`${group.kind === "rod" ? "총 대수" : "총 수량"}: ${quoteQuantityLabel(group.items)}`, ...summaryLines(group));
   }
   const summary = quoteSummary(record.items);
-  lines.push("", "전체 합계", ...summaryLines(summary), `총 견적 금액: ${formatMoney(summary.totalPrice)}`);
-  lines.push("", "평균 적용율은 천 원 단위 조정 후 최종 금액 ÷ 총 가격으로 계산합니다.");
+  lines.push("", "전체 합계", `${record.items.some(isEquipmentItem) ? "총 수량" : "총 대수"}: ${quoteQuantityLabel(record.items)}`, ...summaryLines(summary), `총 견적 금액: ${formatMoney(summary.totalPrice)}`);
+  lines.push("", "평균 적용율은 저장된 최종 금액 ÷ 총 가격으로 계산합니다.");
   if (record.note) lines.push("", `메모: ${record.note}`);
   return lines.join("\n");
 }

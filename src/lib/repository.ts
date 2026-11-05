@@ -1,5 +1,6 @@
 import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch, type Firestore } from 'firebase/firestore';
 import { normalizeBrand, normalizeFishingRod, normalizeQuoteRecord, quoteTotals, validateQuote, type Brand, type FishingRod, type QuoteRecord } from './domain';
+import { cloneEquipmentItem, normalizeEquipmentCategory, normalizeEquipmentProduct, validateEquipmentCategory, validateEquipmentProduct, type EquipmentCategory, type EquipmentProduct } from './equipment';
 
 export type QuoteInput = Pick<QuoteRecord, 'title' | 'note' | 'customerName' | 'mode' | 'items'>;
 type Receive<T> = (value: T) => void;
@@ -7,6 +8,12 @@ type Fail = (error: Error) => void;
 export interface AppRepository {
   watchBrands(receive: Receive<Brand[]>, fail: Fail): () => void;
   watchRods(receive: Receive<FishingRod[]>, fail: Fail): () => void;
+  watchEquipmentCategories(receive: Receive<EquipmentCategory[]>, fail: Fail): () => void;
+  watchEquipmentProducts(receive: Receive<EquipmentProduct[]>, fail: Fail): () => void;
+  saveEquipmentCategory(value: EquipmentCategory): Promise<void>;
+  deleteEquipmentCategory(id: string): Promise<void>;
+  saveEquipmentProduct(value: EquipmentProduct): Promise<void>;
+  deleteEquipmentProduct(id: string): Promise<void>;
   watchQuotes(receive: Receive<QuoteRecord[]>, fail: Fail): () => void;
   watchQuote(id: string, receive: Receive<QuoteRecord | null>, fail: Fail): () => void;
   createBrand(name: string): Promise<void>;
@@ -42,7 +49,7 @@ function rodData(rod: FishingRod) {
 function quoteData(input: QuoteInput) {
   validateQuote(input);
   const totals = quoteTotals(input.items);
-  return { title: input.title.trim(), note: input.note.trim(), customerName: input.customerName.trim(), mode: input.mode, items: input.items.map(item => ({ ...item })), totalQuantity: totals.totalQuantity, totalPrice: totals.totalPrice };
+  return { title: input.title.trim(), note: input.note.trim(), customerName: input.customerName.trim(), mode: input.mode, items: input.items.map(item => item.kind === 'equipment' ? cloneEquipmentItem(item) : ({ ...item })), totalQuantity: totals.totalQuantity, totalPrice: totals.totalPrice };
 }
 export class FirebaseRepository implements AppRepository {
   constructor(private readonly database: Firestore, private readonly session: () => { uid: string | null; authorized: boolean }) {}
@@ -63,6 +70,30 @@ export class FirebaseRepository implements AppRepository {
       try { receive(snapshot.docs.map(value => normalizeFishingRod(value.data(), value.id)).sort((a,b) => a.name.localeCompare(b.name, 'ko'))); } catch(error) { fail(asError(error)); }
     }, fail);
   }
+  watchEquipmentCategories(receive: Receive<EquipmentCategory[]>, fail: Fail) {
+    this.authorize();
+    return onSnapshot(collection(this.database, 'equipment_categories'), snapshot => {
+      try { receive(snapshot.docs.map(value => { const category = normalizeEquipmentCategory(value.data(), value.id); validateEquipmentCategory(category); return category; }).sort((a,b) => a.name.localeCompare(b.name, 'ko'))); } catch(error) { fail(asError(error)); }
+    }, fail);
+  }
+  watchEquipmentProducts(receive: Receive<EquipmentProduct[]>, fail: Fail) {
+    this.authorize();
+    return onSnapshot(collection(this.database, 'equipment_products'), snapshot => {
+      try { receive(snapshot.docs.map(value => { const product = normalizeEquipmentProduct(value.data(), value.id); validateEquipmentProduct(product); return product; }).sort((a,b) => a.name.localeCompare(b.name, 'ko'))); } catch(error) { fail(asError(error)); }
+    }, fail);
+  }
+  async saveEquipmentCategory(value: EquipmentCategory) {
+    this.authorize(); validateEquipmentCategory(value);
+    const category = normalizeEquipmentCategory(value as unknown as Record<string,unknown>, documentId(value.id));
+    await setDoc(doc(this.database, 'equipment_categories', category.id), { ...category, createdAt:value.createdAt??new Date().toISOString(), updatedAt:new Date().toISOString() });
+  }
+  async deleteEquipmentCategory(id: string) { this.authorize(); await deleteDoc(doc(this.database,'equipment_categories',documentId(id))); }
+  async saveEquipmentProduct(value: EquipmentProduct) {
+    this.authorize(); validateEquipmentProduct(value);
+    const product = normalizeEquipmentProduct(value as unknown as Record<string,unknown>, documentId(value.id));
+    await setDoc(doc(this.database, 'equipment_products', product.id), { ...product, createdAt:value.createdAt??new Date().toISOString(), updatedAt:new Date().toISOString() });
+  }
+  async deleteEquipmentProduct(id: string) { this.authorize(); await deleteDoc(doc(this.database,'equipment_products',documentId(id))); }
   watchQuotes(receive: Receive<QuoteRecord[]>, fail: Fail) {
     this.authorize();
     return onSnapshot(query(collection(this.database, 'quote_records'), orderBy('createdAt','desc')), snapshot => {
