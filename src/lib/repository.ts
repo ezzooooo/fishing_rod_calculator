@@ -1,7 +1,7 @@
 import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, writeBatch, type Firestore, type Transaction } from 'firebase/firestore';
 import { normalizeBrand, normalizeFishingRod, normalizeQuoteRecord, quoteTotals, validateQuote, type Brand, type FishingRod, type QuoteRecord } from './domain';
 import { cloneEquipmentItem, normalizeEquipmentCategory, normalizeEquipmentProduct, validateEquipmentCategory, validateEquipmentProduct, type EquipmentCategory, type EquipmentProduct } from './equipment';
-import { assertBrandAvailable, brandDocumentId, normalizeBrandAliases, planBrandImport, validateBrandInput, type BrandImportResult, type BrandInput } from './brands';
+import { activeBrands, assertBrandAvailable, assertBrandDeletable, brandDocumentId, mergedBrandIdsFor, normalizeBrandAliases, planBrandImport, resolveBrandId, validateBrandInput, type BrandImportResult, type BrandInput } from './brands';
 
 export type QuoteInput = Pick<QuoteRecord, 'title' | 'note' | 'customerName' | 'mode' | 'items'>;
 type Receive<T> = (value: T) => void;
@@ -17,8 +17,8 @@ export interface AppRepository {
   deleteEquipmentProduct(id: string): Promise<void>;
   watchQuotes(receive: Receive<QuoteRecord[]>, fail: Fail): () => void;
   watchQuote(id: string, receive: Receive<QuoteRecord | null>, fail: Fail): () => void;
-  createBrand(name: string, aliases?: readonly string[]): Promise<void>;
-  updateBrand(id: string, name: string, aliases?: readonly string[]): Promise<void>;
+  createBrand(name: string, aliases?: readonly string[]): Promise<Brand>;
+  updateBrand(id: string, name: string, aliases?: readonly string[]): Promise<Brand>;
   importBrands(entries: readonly BrandInput[]): Promise<BrandImportResult>;
   deleteBrand(id: string): Promise<void>;
   saveRod(rod: FishingRod): Promise<void>;
@@ -63,14 +63,11 @@ export class FirebaseRepository implements AppRepository {
   watchBrands(receive: Receive<Brand[]>, fail: Fail) {
     this.authorize();
     return onSnapshot(collection(this.database, 'brands'), snapshot => {
-      try { receive(snapshot.docs.map(value => normalizeBrand(value.data(), value.id)).sort((a,b) => a.name.localeCompare(b.name, 'ko'))); } catch(error) { fail(asError(error)); }
+      try { receive(activeBrands(snapshot.docs.map(value => normalizeBrand(value.data(), value.id))).sort((a,b) => a.name.localeCompare(b.name, 'ko'))); } catch(error) { fail(asError(error)); }
     }, fail);
   }
   watchRods(receive: Receive<FishingRod[]>, fail: Fail) {
-    this.authorize();
-    return onSnapshot(collection(this.database, 'fishing_rods'), snapshot => {
-      try { receive(snapshot.docs.map(value => normalizeFishingRod(value.data(), value.id)).sort((a,b) => a.name.localeCompare(b.name, 'ko'))); } catch(error) { fail(asError(error)); }
-    }, fail);
+    return this.watchBrandedCollection('fishing_rods', normalizeFishingRod, receive, fail);
   }
   watchEquipmentCategories(receive: Receive<EquipmentCategory[]>, fail: Fail) {
     this.authorize();
@@ -79,10 +76,23 @@ export class FirebaseRepository implements AppRepository {
     }, fail);
   }
   watchEquipmentProducts(receive: Receive<EquipmentProduct[]>, fail: Fail) {
+    return this.watchBrandedCollection('equipment_products', (raw, id) => { const product = normalizeEquipmentProduct(raw, id); validateEquipmentProduct(product); return product; }, receive, fail);
+  }
+  private watchBrandedCollection<T extends { name: string; brandId: string }>(path: string, normalize: (raw: Record<string, unknown>, id: string) => T, receive: Receive<T[]>, fail: Fail) {
     this.authorize();
-    return onSnapshot(collection(this.database, 'equipment_products'), snapshot => {
-      try { receive(snapshot.docs.map(value => { const product = normalizeEquipmentProduct(value.data(), value.id); validateEquipmentProduct(product); return product; }).sort((a,b) => a.name.localeCompare(b.name, 'ko'))); } catch(error) { fail(asError(error)); }
+    let brands: Brand[] | null = null;
+    let values: T[] | null = null;
+    const publish = () => {
+      if (!brands || !values) return;
+      receive(values.map(value => ({ ...value, brandId: resolveBrandId(brands!, value.brandId) })).sort((a, b) => a.name.localeCompare(b.name, 'ko')));
+    };
+    const stopBrands = onSnapshot(collection(this.database, 'brands'), snapshot => {
+      try { brands = snapshot.docs.map(value => normalizeBrand(value.data(), value.id)); publish(); } catch (error) { fail(asError(error)); }
     }, fail);
+    const stopValues = onSnapshot(collection(this.database, path), snapshot => {
+      try { values = snapshot.docs.map(value => normalize(value.data(), value.id)); publish(); } catch (error) { fail(asError(error)); }
+    }, fail);
+    return () => { stopBrands(); stopValues(); };
   }
   async saveEquipmentCategory(value: EquipmentCategory) {
     this.authorize(); validateEquipmentCategory(value);
@@ -119,25 +129,30 @@ export class FirebaseRepository implements AppRepository {
       return apply(transaction, latest.filter(value => value.exists()).map(value => normalizeBrand(value.data()!, value.id)));
     });
   }
-  async createBrand(name: string, aliases?: readonly string[]) {
+  async createBrand(name: string, aliases?: readonly string[]): Promise<Brand> {
     this.authorize();
     const value = validateBrandInput({ name, aliases });
-    await this.brandTransaction([value.name], (transaction, brands) => {
+    return this.brandTransaction([value.name], (transaction, brands) => {
       assertBrandAvailable(brands, value);
       const id = brandDocumentId(value.name);
       if (brands.some(brand => brand.id === id)) throw new Error('브랜드 주소가 기존 데이터와 겹칩니다. 이름을 확인해주세요.');
-      transaction.set(doc(this.database, 'brands', id), { ...value, createdAt: new Date().toISOString(), updatedAt: null });
+      const data = { ...value, createdAt: new Date().toISOString(), updatedAt: null };
+      transaction.set(doc(this.database, 'brands', id), data);
+      return normalizeBrand(data, id);
     });
   }
-  async updateBrand(id: string, name: string, aliases?: readonly string[]) {
+  async updateBrand(id: string, name: string, aliases?: readonly string[]): Promise<Brand> {
     this.authorize(); documentId(id);
     validateBrandInput({ name, aliases });
-    await this.brandTransaction([name], (transaction, brands) => {
+    return this.brandTransaction([name], (transaction, brands) => {
       const previous = brands.find(brand => brand.id === id);
       if (!previous) throw new Error('삭제된 브랜드입니다. 목록을 새로 불러와주세요.');
+      if (resolveBrandId(brands, id) !== id) throw new Error('다른 대표명에 연결된 브랜드입니다. 대표 브랜드를 수정해주세요.');
       const value = validateBrandInput({ name, aliases: [...(aliases ?? previous.aliases ?? []), ...(previous.name !== name.trim() ? [previous.name] : [])] });
       assertBrandAvailable(brands, value, id);
-      transaction.update(doc(this.database, 'brands', id), { ...value, updatedAt: new Date().toISOString() });
+      const data = { ...value, updatedAt: new Date().toISOString() };
+      transaction.update(doc(this.database, 'brands', id), data);
+      return normalizeBrand({ ...previous, ...data }, id);
     });
   }
   async importBrands(entries: readonly BrandInput[]): Promise<BrandImportResult> {
@@ -152,7 +167,10 @@ export class FirebaseRepository implements AppRepository {
       for (const entry of plan.entries) {
         if (entry.action === 'unchanged') continue;
         const value = { name: entry.name, aliases: entry.aliases, updatedAt: now };
-        if (entry.action === 'update' && entry.id) transaction.update(doc(this.database, 'brands', entry.id), value);
+        if (entry.action === 'update' && entry.id) {
+          transaction.update(doc(this.database, 'brands', entry.id), { ...value, ...(entry.mergeIds?.length ? { mergedBrandIds: mergedBrandIdsFor(brands, entry.id, entry.mergeIds) } : {}) });
+          for (const id of entry.mergeIds ?? []) transaction.update(doc(this.database, 'brands', id), { mergedInto: entry.id, updatedAt: now });
+        }
         else if (entry.action === 'create') {
           const id = brandDocumentId(entry.name);
           if (brands.some(brand => brand.id === id)) throw new Error('브랜드 주소가 기존 데이터와 겹칩니다. 미리보기를 다시 확인해주세요.');
@@ -162,7 +180,13 @@ export class FirebaseRepository implements AppRepository {
       return { created: plan.created, updated: plan.updated, unchanged: plan.unchanged };
     });
   }
-  async deleteBrand(id: string) { this.authorize(); await deleteDoc(doc(this.database,'brands',documentId(id))); }
+  async deleteBrand(id: string) {
+    this.authorize(); documentId(id);
+    await this.brandTransaction([], (transaction, brands) => {
+      assertBrandDeletable(brands, id);
+      transaction.delete(doc(this.database, 'brands', id));
+    });
+  }
   async saveRod(rod: FishingRod) { this.authorize(); await setDoc(doc(this.database,'fishing_rods',documentId(rod.id)),rodData(rod)); }
   async deleteRod(id: string) { this.authorize(); await deleteDoc(doc(this.database,'fishing_rods',documentId(id))); }
   private async replace<T extends {id: string}>(path: string, values: T[]) {

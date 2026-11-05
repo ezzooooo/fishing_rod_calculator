@@ -6,7 +6,7 @@ import { useApp } from "@/lib/app-context";
 import { useEquipmentCatalog } from "@/lib/equipment-context";
 import { availableLengths, normalizeBrand, normalizeFishingRod, priceForLength, type Brand, type FishingRod, type PriceMap } from "@/lib/domain";
 import { brandKey, brandSearchText, matchesBrand, planBrandImport } from "@/lib/brands";
-import { brandReviewPending, confirmedBrandRecommendations } from "@/lib/brand-recommendations";
+import { brandReviewPending, confirmedBrandRecommendations, userConfirmedBrandRecommendations, userConfirmedBrandReviewItems } from "@/lib/brand-recommendations";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { Button, EmptyState, Field, Input, Modal, PageHeading, Textarea } from "@/components/ui";
 import styles from "./catalog-workspace.module.css";
@@ -23,7 +23,7 @@ function ConfirmDelete({ title, description, busy, onClose, onConfirm }: { title
 }
 
 export function BrandManagement() {
-  const { brands, rods, repository, notify, catalogLoading, catalogError } = useApp();
+  const { brands, rods, repository, saveBrand, notify, catalogLoading, catalogError } = useApp();
   const { products } = useEquipmentCatalog();
   const [search, setSearch] = useState("");
   const [editor, setEditor] = useState<Brand | "new" | null>(null);
@@ -36,6 +36,14 @@ export function BrandManagement() {
   const filtered = brands.filter((brand) => matchesBrand(brand, search));
   const importPlan = planBrandImport(brands, confirmedBrandRecommendations);
   const importable = importPlan.entries.filter((entry) => entry.action === "create" || entry.action === "update");
+  const userReviewPlan = planBrandImport(brands, userConfirmedBrandRecommendations);
+  const unresolved = new Map(userReviewPlan.entries.filter((entry) => entry.action !== "unchanged").map((entry) => [entry.name, entry]));
+  const reviewItems = [...brandReviewPending, ...userConfirmedBrandReviewItems.filter((item) => unresolved.has(item.canonicalName)).map((item) => ({
+    ...item,
+    name: item.canonicalName,
+    reason: unresolved.get(item.canonicalName)?.action === "conflict" ? unresolved.get(item.canonicalName)!.reason ?? "기존 브랜드의 중복을 확인해주세요." : "확정한 대표명과 별칭을 등록하면 이 목록에서 제거됩니다.",
+  }))];
+  const mergeGroups = importable.filter((entry) => entry.mergeIds?.length).length;
   const available = !!repository && !catalogLoading && !catalogError && !busy;
   const openEditor = (brand: Brand | "new") => { setEditor(brand); setName(brand === "new" ? "" : brand.name); setAliases(brand === "new" ? "" : (brand.aliases ?? []).join("\n")); setError(""); };
   async function save(event: FormEvent) {
@@ -45,8 +53,8 @@ export function BrandManagement() {
     setBusy(true); setError("");
     try {
       const names = aliases.split(/[\n,，]/).map((value) => value.trim()).filter(Boolean);
-      if (editor === "new") await repository.createBrand(name.trim(), names);
-      else await repository.updateBrand(editor.id, name.trim(), names);
+      const saved = await saveBrand(editor === "new" ? null : editor.id, name.trim(), names);
+      if (search.trim() && !matchesBrand(saved, search)) setSearch(saved.name);
       setEditor(null); notify("브랜드를 저장했습니다.", "success");
     } catch (failure) { setError(failure instanceof Error ? failure.message : "브랜드를 저장하지 못했습니다. 잠시 후 다시 시도해주세요."); }
     finally { setBusy(false); }
@@ -65,7 +73,7 @@ export function BrandManagement() {
     if (!repository || !deleting || busy) return;
     setBusy(true);
     try { await repository.deleteBrand(deleting.id); setDeleting(null); notify("브랜드를 삭제했습니다.", "success"); }
-    catch { setDeleting(null); notify("브랜드를 삭제하지 못했습니다. 다시 시도해주세요.", "error"); }
+    catch (failure) { setDeleting(null); notify(failure instanceof Error ? failure.message : "브랜드를 삭제하지 못했습니다. 다시 시도해주세요.", "error"); }
     finally { setBusy(false); }
   }
   return <>
@@ -75,16 +83,16 @@ export function BrandManagement() {
       <div className={styles.toolbar}><div><strong>등록 브랜드</strong><span>{search ? `${filtered.length} / ${brands.length}` : brands.length}개</span></div><div className={styles.search}><Search size={17} /><Input aria-label="브랜드 검색" type="search" placeholder="대표명 또는 별칭 검색" value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
       {filtered.length ? <div className={styles.tableScroll}><table className={`${styles.table} ${styles.brandTable}`}><thead><tr><th>대표명 / 별칭</th><th>등록 제품</th><th className={styles.optional}>최근 변경</th><th className={styles.actionsHeading}>관리</th></tr></thead><tbody>{filtered.map((brand) => <tr key={brand.id}><td><strong>{brand.name}</strong>{!!brand.aliases?.length && <small className={styles.brandAliases}>별칭 {brand.aliases.join(" · ")}</small>}</td><td>{rods.filter((rod) => rod.brandId === brand.id).length + products.filter((product) => product.brandId === brand.id).length}종</td><td className={`${styles.muted} ${styles.optional}`}>{formatDateTime(brand.updatedAt || brand.createdAt) || "—"}</td><td><div className={styles.actions}><Button variant="ghost" aria-label={`${brand.name} 수정`} disabled={!available} onClick={() => openEditor(brand)}><Pencil size={15} /><span className={styles.actionLabel}>수정</span></Button><Button variant="ghost" className={styles.dangerAction} aria-label={`${brand.name} 삭제`} disabled={!available} onClick={() => setDeleting(brand)}><Trash2 size={15} /><span className={styles.srOnly}>삭제</span></Button></div></td></tr>)}</tbody></table></div> : !catalogLoading && !catalogError ? <EmptyState title={search ? "검색 결과가 없습니다" : "등록된 브랜드가 없습니다"} description={search ? "다른 대표명이나 별칭으로 검색해주세요." : "브랜드를 등록한 뒤 낚시대와 용품을 추가할 수 있습니다."} /> : null}
     </section>
-    <details className={styles.brandReview}>
-      <summary><span>확인 필요 브랜드 <small>{brandReviewPending.length}묶음 · 등록 제외</small></span><ChevronDown size={16} /></summary>
-      <div className={styles.brandReviewIntro}>제품 라벨이나 제조사 표기를 확인한 뒤 대표명을 정해주세요. 아래 표기는 검토 브랜드 등록에 포함되지 않습니다.</div>
-      <div className={styles.tableScroll}><table className={`${styles.table} ${styles.reviewTable}`}><thead><tr><th>확인할 표기</th><th>확인 내용</th><th>근거</th></tr></thead><tbody>{brandReviewPending.map((item) => <tr key={item.name}><td><strong>{item.name}</strong><small className={styles.brandAliases}>{item.aliases.join(" · ")}</small></td><td>{item.reason}</td><td><div className={styles.sourceLinks}>{item.exampleUrl && <a href={item.exampleUrl} target="_blank" rel="noreferrer">상품 보기</a>}{item.sourceUrls?.map((url, index) => <a key={url} href={url} target="_blank" rel="noreferrer">참고 {index + 1}</a>)}</div></td></tr>)}</tbody></table></div>
-    </details>
+    {!catalogLoading && !catalogError && (reviewItems.length ? <details className={styles.brandReview}>
+      <summary><span>확인 필요 브랜드 <small>{reviewItems.length}묶음{unresolved.size > 0 ? " · 등록 대기" : " · 등록 제외"}</small></span><ChevronDown size={16} /></summary>
+      <div className={styles.brandReviewIntro}>{unresolved.size > 0 ? "확정한 대표명을 검토 브랜드 등록에서 반영해주세요. 저장이 완료된 항목은 이 목록에서 자동으로 사라집니다." : "제품 라벨이나 제조사 표기를 확인한 뒤 대표명을 정해주세요. 아래 표기는 검토 브랜드 등록에 포함되지 않습니다."}</div>
+      <div className={styles.tableScroll}><table className={`${styles.table} ${styles.reviewTable}`}><thead><tr><th>대표명 / 다른 표기</th><th>확인 내용</th><th>근거</th></tr></thead><tbody>{reviewItems.map((item) => <tr key={item.name}><td><strong>{item.name}</strong><small className={styles.brandAliases}>{item.aliases.join(" · ")}</small></td><td>{item.reason}</td><td><div className={styles.sourceLinks}>{item.exampleUrl && <a href={item.exampleUrl} target="_blank" rel="noreferrer">상품 보기</a>}{item.sourceUrls?.map((url, index) => <a key={url} href={url} target="_blank" rel="noreferrer">참고 {index + 1}</a>)}</div></td></tr>)}</tbody></table></div>
+    </details> : <div className={styles.brandReviewComplete} role="status">확인 필요 브랜드 없음</div>)}
     {editor && <Modal title={editor === "new" ? "브랜드 추가" : "브랜드 수정"} onClose={busy ? undefined : () => setEditor(null)} footer={<><Button variant="secondary" disabled={busy} onClick={() => setEditor(null)}>취소</Button><Button type="submit" form="brand-editor" disabled={busy}>{busy ? "저장 중…" : "저장"}</Button></>}><form id="brand-editor" className={styles.editor} onSubmit={save}><Field label="브랜드명"><Input autoFocus required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} placeholder="대표 브랜드명을 입력하세요" disabled={busy} /></Field><Field label="별칭 (선택)" hint="줄바꿈이나 쉼표로 구분해주세요. 별칭으로 검색해도 이 브랜드가 나옵니다."><Textarea rows={3} maxLength={6000} value={aliases} onChange={(event) => setAliases(event.target.value)} placeholder={"예: 동일\n동일레져"} disabled={busy} /></Field>{error && <p className={styles.error} role="alert">{error}</p>}</form></Modal>}
     {importing && <Modal wide title="검토 브랜드 등록 확인" onClose={busy ? undefined : () => setImporting(false)} footer={<><Button variant="secondary" disabled={busy} onClick={() => setImporting(false)}>취소</Button><Button disabled={!available || !importable.length} onClick={importConfirmed}>{busy ? "등록 중…" : "확인 후 등록"}</Button></>}>
-      <div className={styles.brandImportSummary}><strong>새 브랜드 {importPlan.created}개</strong><span>표기·별칭 보완 {importPlan.updated}개</span><span>이미 반영 {importPlan.unchanged}개</span>{importPlan.conflicts > 0 && <span className={styles.importConflict}>중복 확인 필요 {importPlan.conflicts}개 · 제외</span>}</div>
-      <p className={styles.brandImportHint}>상품에서 확인한 대표명과 별칭을 반영합니다. 기존 브랜드의 ID와 등록 제품 연결은 유지합니다. 확인 필요 목록은 제외했습니다.</p>
-      <div className={`${styles.tableScroll} ${styles.importTableScroll}`}><table className={`${styles.table} ${styles.importTable}`}><thead><tr><th>대표명</th><th>등록할 별칭</th><th>처리</th></tr></thead><tbody>{importPlan.entries.map((entry) => <tr key={entry.name}><td><strong>{entry.name}</strong></td><td>{entry.aliases.join(" · ") || "—"}</td><td><span className={entry.action === "conflict" ? styles.importConflict : styles.muted}>{entry.action === "create" ? "새로 등록" : entry.action === "update" ? "기존 브랜드 보완" : entry.action === "unchanged" ? "이미 반영됨" : "중복 확인 후 등록"}</span>{entry.reason && <small className={styles.brandAliases}>{entry.reason}</small>}</td></tr>)}</tbody></table></div>
+      <div className={styles.brandImportSummary}><strong>새 브랜드 {importPlan.created}개</strong><span>표기·별칭 보완 {importPlan.updated}개</span><span>이미 반영 {importPlan.unchanged}개</span>{mergeGroups > 0 && <span>중복 연결 {mergeGroups}묶음</span>}{importPlan.conflicts > 0 && <span className={styles.importConflict}>중복 확인 필요 {importPlan.conflicts}개 · 제외</span>}</div>
+      <p className={styles.brandImportHint}>검토한 대표명과 별칭을 반영합니다. 기존 브랜드와 등록 제품의 연결은 유지하며, 같은 대표명의 중복은 원본을 보존해 연결합니다.</p>
+      <div className={`${styles.tableScroll} ${styles.importTableScroll}`}><table className={`${styles.table} ${styles.importTable}`}><thead><tr><th>대표명</th><th>등록할 별칭</th><th>처리</th></tr></thead><tbody>{importPlan.entries.map((entry) => <tr key={entry.name}><td><strong>{entry.name}</strong></td><td>{entry.aliases.join(" · ") || "—"}</td><td><span className={entry.action === "conflict" ? styles.importConflict : styles.muted}>{entry.action === "create" ? "새로 등록" : entry.action === "update" ? entry.mergeIds?.length ? `중복 ${entry.mergeIds.length + 1}개 연결` : "기존 브랜드 보완" : entry.action === "unchanged" ? "이미 반영됨" : "중복 확인 후 등록"}</span>{entry.reason && <small className={styles.brandAliases}>{entry.reason}</small>}</td></tr>)}</tbody></table></div>
       {error && <p className={styles.error} role="alert">{error}</p>}
     </Modal>}
     {deleting && <ConfirmDelete title="브랜드 삭제" description={`‘${deleting.name}’ 브랜드를 삭제할까요? 이 브랜드에 등록된 제품은 함께 삭제되지 않습니다. 저장된 견적도 유지됩니다.`} busy={busy} onClose={() => setDeleting(null)} onConfirm={remove} />}

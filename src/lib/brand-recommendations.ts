@@ -1,6 +1,7 @@
 /**
  * 2026-11-05 공개 상품 4,534건 제목·본문 감사에서 검토한 관리용 대표명/검색 별칭입니다.
  * 자동 등록하지 않으며 현재 데이터와 대조한 미리보기와 명시적인 UI 확인 후 적용합니다.
+ * 확인 필요 항목은 2026-11-05 사용자가 지정한 대표명과 검색 별칭으로 확정했습니다.
  * 법적 회사 동일성이나 상품 모델명 일괄 치환을 뜻하지 않습니다.
  */
 export interface BrandRecommendation {
@@ -8,6 +9,9 @@ export interface BrandRecommendation {
   aliases: string[];
   note?: string;
   exampleUrl?: string;
+  sourceUrls?: string[];
+  confirmedBy?: 'user';
+  confirmedOn?: string;
 }
 export interface BrandReviewItem {
   name: string;
@@ -17,7 +21,7 @@ export interface BrandReviewItem {
   sourceUrls?: string[];
 }
 
-export const confirmedBrandRecommendations: BrandRecommendation[] = [
+const auditedBrandRecommendations: BrandRecommendation[] = [
   {
     "name": "동일레저",
     "aliases": [
@@ -358,7 +362,7 @@ export const confirmedBrandRecommendations: BrandRecommendation[] = [
   }
 ];
 
-export const brandReviewPending: BrandReviewItem[] = [
+const reviewedBrandItems: BrandReviewItem[] = [
   {
     "name": "호봉레져",
     "aliases": [
@@ -702,3 +706,83 @@ export const brandReviewPending: BrandReviewItem[] = [
     ]
   }
 ];
+
+/** Existing review rows stay available until these changes are actually saved. */
+export interface UserConfirmedBrandReviewItem extends BrandReviewItem {
+  canonicalName: string;
+  confirmedBy: 'user';
+  confirmedOn: string;
+}
+
+const userConfirmedNames = new Map<string, string>([
+  ['호봉레져', '호봉레져'],
+  ['레져다오', '레져다오'],
+  ['승일레져', '승일레저'],
+  ['늘푸른레저', '늘푸른레져'],
+  ['일또낚', '일또낚'],
+  ['제우스레져', '제우스레져'],
+  ['대륙 / 대륙프로피싱', '대륙프로피싱'],
+  ['오케이 / 동진기업 ↔ OK', '오케이'],
+  ['대물낚시300일', '대물낚시300일'],
+  ['백조상사', '백조'],
+  ['성우이엔씨', '성우이엔씨'],
+  ['하이레저', '하이레져'],
+  ['비바 / 비바피싱 / 비바보트', '비바피싱'],
+  ['피쉬베스트 (확인 후 통일)', '피시베스트'],
+  ['나우피싱', '나우피싱'],
+  ['다잡캠핑', '다잡'],
+  ['씨마 / 씨마플러스', '씨마'],
+  ['히든 / 히든피싱', '히든피싱'],
+  ['거명 / 거명산업', '거명'],
+  ['삼우빅케치', '삼우빅캐치'],
+  ['선FC', '선FC'],
+  ['로구만 / 로구맨', '로구만'],
+  ['릿찌 / 릿지', '릿'],
+  ['센스엔텍 / 센스앤텍', '센스앤텍'],
+  ['유양산업', '유양산업'],
+  ['영상산업 / 영규산업', '영규산업'],
+  ['봄향기 제조사 구분', '봄팩토리'],
+  ['소야 제조사 구분', '한라낚시'],
+]);
+
+export const userConfirmedBrandReviewItems: UserConfirmedBrandReviewItem[] = reviewedBrandItems.filter(item => userConfirmedNames.has(item.name)).map(item => ({
+  ...item,
+  aliases: [...item.aliases],
+  sourceUrls: item.sourceUrls ? [...item.sourceUrls] : undefined,
+  canonicalName: userConfirmedNames.get(item.name)!,
+  confirmedBy: 'user',
+  confirmedOn: '2026-11-05',
+}));
+
+function distinctAliases(name: string, aliases: string[]): string[] {
+  return [...new Set(aliases.map(alias => alias.trim()).filter(alias => alias && alias !== name))];
+}
+
+/** These are management decisions explicitly supplied by the user, not manufacturer claims. */
+export const userConfirmedBrandRecommendations: BrandRecommendation[] = userConfirmedBrandReviewItems.map(item => {
+  const previousName = item.canonicalName === '오케이' ? 'OK' : item.canonicalName;
+  const previous = auditedBrandRecommendations.find(brand => brand.name === previousName);
+  const additionalAliases = item.canonicalName === '릿' ? ['REET'] : item.canonicalName === '대물낚시300일' ? ['대물낚시 300일'] : [];
+  return {
+    name: item.canonicalName,
+    aliases: distinctAliases(item.canonicalName, [...item.aliases, ...(previous ? [previous.name, ...previous.aliases] : []), ...additionalAliases]),
+    note: `2026-11-05 사용자가 대표명을 ‘${item.canonicalName}’으로 지정하고 나머지 관찰 표기를 검색 별칭으로 연결하도록 확인했습니다.`,
+    exampleUrl: item.exampleUrl,
+    sourceUrls: [...new Set([...(item.sourceUrls ?? []), ...(previous?.exampleUrl ? [previous.exampleUrl] : []), ...(previous?.sourceUrls ?? [])])],
+    confirmedBy: 'user',
+    confirmedOn: item.confirmedOn,
+  };
+});
+
+function allConfirmedRecommendations(): BrandRecommendation[] {
+  const userNames = new Set(userConfirmedBrandRecommendations.map(brand => brand.name));
+  return [
+    ...auditedBrandRecommendations.filter(brand => brand.name !== 'OK' && !userNames.has(brand.name)),
+    ...userConfirmedBrandRecommendations,
+  ];
+}
+
+export const confirmedBrandRecommendations: BrandRecommendation[] = allConfirmedRecommendations();
+
+/** Unresolved research decisions; saved-state checks use userConfirmedBrandReviewItems above. */
+export const brandReviewPending: BrandReviewItem[] = reviewedBrandItems.filter(item => !userConfirmedNames.has(item.name));

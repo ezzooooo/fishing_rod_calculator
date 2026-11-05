@@ -9,6 +9,10 @@ export interface Brand {
   id: string;
   name: string;
   aliases?: string[];
+  /** Retained duplicate document; existing product references resolve to this brand. */
+  mergedInto?: string | null;
+  /** Keeps legacy product links usable in active-brand backups as well. */
+  mergedBrandIds?: string[];
   createdAt?: string | null;
   updatedAt?: string | null;
 }
@@ -203,6 +207,8 @@ export function normalizeBrand(
     id: id ?? text(raw.id),
     name: text(raw.name),
     aliases: normalizeBrandAliases(text(raw.name), raw.aliases),
+    ...(text(raw.mergedInto).trim() ? { mergedInto: text(raw.mergedInto).trim() } : {}),
+    ...(Array.isArray(raw.mergedBrandIds) ? { mergedBrandIds: [...new Set(raw.mergedBrandIds.filter((value): value is string => typeof value === "string" && !!value && !value.includes("/") && value !== (id ?? text(raw.id))))] } : {}),
     createdAt: normalizeDate(raw.createdAt),
     updatedAt: normalizeDate(raw.updatedAt),
   };

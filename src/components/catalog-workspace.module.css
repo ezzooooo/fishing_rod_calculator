@@ -30,6 +30,7 @@
 .brandTable td:first-child { width:38%; }
 .brandAliases { display:block; margin-top:4px; color:var(--muted,#687872); font-size:11px; font-weight:400; line-height:1.6; overflow-wrap:anywhere; }
 .brandReview { margin-top:16px; overflow:hidden; border:1px solid var(--line,#e1e8e1); border-radius:12px; background:var(--paper,#fff); }
+.brandReviewComplete { margin-top:16px; padding:14px 16px; border:1px solid var(--line,#e1e8e1); border-radius:12px; background:var(--paper,#fff); color:var(--muted,#687872); font-size:12px; }
 .brandReview > summary { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:46px; padding:12px 16px; color:#365342; font-size:13px; font-weight:600; cursor:pointer; list-style:none; }
 .brandReview > summary::-webkit-details-marker { display:none; }
 .brandReview > summary small { margin-left:8px; color:var(--muted,#687872); font-size:11px; font-weight:400; }

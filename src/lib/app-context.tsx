@@ -7,6 +7,7 @@ import { firebaseServices, isDemoMode, SYSTEM_SETTINGS_ADMIN_UID } from './fireb
 import { FirebaseRepository, asError, type AppRepository } from './repository';
 import { DemoRepository } from './demo-repository';
 import type { Brand, FishingRod } from './domain';
+import { upsertSavedBrand } from './brands';
 import { createCatalogReadinessTracker, type CatalogSource, type SessionStatus } from './session-state';
 
 export interface AppUser {uid:string;email:string;}
@@ -15,6 +16,7 @@ interface AppContextValue {
   status:SessionStatus;user:AppUser|null;isAdmin:boolean;isDemo:boolean;authError:string|null;
   brands:Brand[];rods:FishingRod[];catalogLoading:boolean;catalogError:string|null;
   repository:AppRepository|null;signIn:(email:string,password:string)=>Promise<void>;signOut:()=>Promise<void>;
+  saveBrand:(id:string|null,name:string,aliases?:readonly string[])=>Promise<Brand>;
   notify:(message:string,tone?:'success'|'error'|'info')=>void;retry:()=>void;
 }
 const Context=createContext<AppContextValue|null>(null);
@@ -40,7 +42,7 @@ export function AppProvider({children}:{children:ReactNode}) {
     queueMicrotask(()=>{
       if(!alive)return;
       setAuthError(null);
-      if(demo){session.current={uid:'demo-staff',authorized:true};setUser({uid:'demo-staff',email:'preview@example.test'});setRepository(new DemoRepository());setStatus('authorized');return;}
+      if(demo){session.current={uid:'demo-staff',authorized:true};setUser({uid:'demo-staff',email:'preview@example.test'});setRepository(new DemoRepository({brandSnapshotDelayMs:Number(process.env.NEXT_PUBLIC_DEMO_BRAND_SNAPSHOT_DELAY_MS)||0}));setStatus('authorized');return;}
       try{
         const services=firebaseServices();
         setRepository(new FirebaseRepository(services.database,()=>session.current));
@@ -78,7 +80,14 @@ export function AppProvider({children}:{children:ReactNode}) {
     if(!demo)await firebaseSignOut(firebaseServices().auth);
     session.current={uid:null,authorized:false};setUser(null);setStatus('signedOut');setBrands([]);setRods([]);
   },[demo]);
-  return <Context.Provider value={{status,user,isAdmin:demo||user?.uid===SYSTEM_SETTINGS_ADMIN_UID,isDemo:demo,authError,brands,rods,catalogLoading,catalogError,repository,signIn,signOut,notify,retry:()=>setAttempt(value=>value+1)}}>
+  const saveBrand=useCallback(async(id:string|null,name:string,aliases?:readonly string[])=>{
+    if(!repository)throw new Error('브랜드 목록을 불러온 뒤 다시 저장해주세요.');
+    const owner=session.current.uid;
+    const saved=id===null?await repository.createBrand(name,aliases):await repository.updateBrand(id,name,aliases);
+    if(owner&&session.current.authorized&&session.current.uid===owner)setBrands(current=>upsertSavedBrand(current,saved));
+    return saved;
+  },[repository]);
+  return <Context.Provider value={{status,user,isAdmin:demo||user?.uid===SYSTEM_SETTINGS_ADMIN_UID,isDemo:demo,authError,brands,rods,catalogLoading,catalogError,repository,signIn,signOut,saveBrand,notify,retry:()=>setAttempt(value=>value+1)}}>
     {children}
     {notice&&<div className={`toast toast-${notice.tone}`} role={notice.tone==='error'?'alert':'status'}><span>{notice.message}</span><button aria-label="알림 닫기" onClick={()=>setNotice(null)}>×</button></div>}
   </Context.Provider>;

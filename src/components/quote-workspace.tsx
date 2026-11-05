@@ -9,7 +9,7 @@ import { useApp } from "@/lib/app-context";
 import { useQuoteDraft } from "@/lib/quote-draft-context";
 import { adjustedUnitPrice, availableLengths, buildQuoteText, groupQuoteItems, isEquipmentItem, modeLabel, priceForLength, quoteItemName, quoteItemSpecification, quoteItemUnit, quoteItemsFromDraft, quoteQuantityLabel, quoteSummary, quoteTotals, removeDraftRod, upsertDraftRod, validateQuote, type CalculationMode, type EquipmentQuoteItem, type FishingRod, type QuoteDraft, type QuoteDraftRod, type QuoteItem, type QuoteRecord, type RodQuoteItem } from "@/lib/domain";
 import { formatAppliedRate, formatDateKey, formatDateTime, formatLengthRange, formatMoney } from "@/lib/format";
-import { brandKey, brandSearchText } from "@/lib/brands";
+import { brandKey, brandSearchText, resolveBrandId } from "@/lib/brands";
 import type { Brand } from "@/lib/domain";
 import { copyReceiptImage, createReceiptImage, downloadReceiptImage } from "@/lib/receipt-image";
 import { QuoteConflictError } from "@/lib/repository";
@@ -124,7 +124,7 @@ function RodPicker({ mode, rods, brands, groups, initial, onClose, onApply }: Ro
   const [error, setError] = useState("");
   const selected = catalogue.find(rod => rod.id === selectedId);
   const filtered = catalogue.filter(rod => {
-    const brand = brands.find(value => value.id === rod.brandId);
+    const brand = brands.find(value => value.id === resolveBrandId(brands, rod.brandId));
     return brandKey(`${brandName(rod)} ${rod.name} ${brand ? brandSearchText(brand) : ""}`).includes(brandKey(search.trim()));
   });
   const lengths = Object.keys(lines).map(Number).sort((a, b) => a - b);

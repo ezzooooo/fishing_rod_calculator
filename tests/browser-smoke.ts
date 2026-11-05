@@ -13,7 +13,7 @@ const origin=`http://127.0.0.1:${port}`;
 process.env.BROWSER_BASE_URL=origin;
 await mkdir('outputs/next-migration',{recursive:true});
 let serverOutput='';
-const child=spawn(process.execPath,[require.resolve('next/dist/bin/next'),'dev','--webpack','--hostname','127.0.0.1','--port',String(port)],{env:{...process.env,NODE_ENV:'development',NEXT_PUBLIC_DEMO_MODE:'true'},stdio:['ignore','pipe','pipe']});
+const child=spawn(process.execPath,[require.resolve('next/dist/bin/next'),'dev','--webpack','--hostname','127.0.0.1','--port',String(port)],{env:{...process.env,NODE_ENV:'development',NEXT_PUBLIC_DEMO_MODE:'true',NEXT_PUBLIC_DEMO_BRAND_SNAPSHOT_DELAY_MS:'350'},stdio:['ignore','pipe','pipe']});
 child.stdout.on('data',chunk=>{serverOutput=(serverOutput+String(chunk)).slice(-12000);});
 child.stderr.on('data',chunk=>{serverOutput=(serverOutput+String(chunk)).slice(-12000);});
 let browser;
