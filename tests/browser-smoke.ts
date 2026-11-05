@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { chromium } from 'playwright';
 import { quoteBrowserFlow } from './quote-browser-flow';
 import { catalogBrowserFlow } from './catalog-browser-flow';
+import { brandBrowserFlow } from './brand-browser-flow';
 
 const require=createRequire(import.meta.url);
 const port=Number(process.env.FISHJOONGO_TEST_PORT||3100);
@@ -44,6 +45,13 @@ try{
   await catalogBrowserFlow(catalogPage);
   await catalogContext.close();
   console.log('PASS: brand/rod CRUD, price editor, JSON import/export, protected settings and mobile layout');
+  const brandContext=await browser.newContext({baseURL:origin,viewport:{width:1366,height:768}});
+  const brandPage=await brandContext.newPage();
+  brandPage.on('pageerror',error=>errors.push(error.message));
+  brandPage.on('request',request=>{if(/firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com/.test(request.url()))backendRequests.push(request.url());});
+  await brandBrowserFlow(brandPage);
+  await brandContext.close();
+  console.log('PASS: confirmed brand registration, review exclusions, alias search and saved quote preservation');
   assert.deepEqual(backendRequests,[],'Preview must never request the live Firebase backend');
   assert.deepEqual(errors,[],'Browser runtime errors');
   console.log('PASS: no runtime errors and no live Firebase requests');

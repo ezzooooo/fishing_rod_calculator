@@ -7,6 +7,7 @@ import { useEquipmentCatalog } from "@/lib/equipment-context";
 import { calculateEquipmentQuoteItem, equipmentPriceForMode, type EquipmentOptionGroup, type EquipmentProduct } from "@/lib/equipment";
 import { modeLabel, type CalculationMode, type EquipmentComponentSnapshot, type EquipmentQuoteItem } from "@/lib/domain";
 import { formatAppliedRate, formatMoney } from "@/lib/format";
+import { brandKey, brandSearchText } from "@/lib/brands";
 import { Button, Field, Input, Modal } from "@/components/ui";
 import styles from "./equipment-picker.module.css";
 
@@ -51,9 +52,9 @@ export function EquipmentPicker({ mode, initial, onClose, onApply }: Props) {
   const [components, setComponents] = useState<ComponentLine[]>(() => componentLines(initial));
   const [error, setError] = useState("");
   const filteredProducts = products.filter(product => {
-    const brand = brands.find(value => value.id === product.brandId)?.name ?? "";
+    const brand = brands.find(value => value.id === product.brandId);
     const category = categories.find(value => value.id === product.categoryId)?.name ?? "";
-    return `${product.name} ${product.specification} ${brand} ${category}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
+    return brandKey(`${product.name} ${product.specification} ${brand ? brandSearchText(brand) : ""} ${category}`).includes(brandKey(search.trim()));
   });
   const selectedProduct = products.find(product => product.id === source);
   const productOptions = selectedProduct && !filteredProducts.some(product => product.id === selectedProduct.id)
@@ -173,7 +174,7 @@ export function EquipmentPicker({ mode, initial, onClose, onApply }: Props) {
         <Field label="분류"><select className="control" value={categorySelect} onChange={event => changeCategory(event.target.value)}><option value={customCategory}>직접 입력</option>{categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></Field>
         {categorySelect === customCategory && <Field label="분류명"><Input required maxLength={120} value={categoryName} onChange={event => { setCategoryName(event.target.value); setCategoryId("manual"); }} placeholder="예: 텐트, 좌대, 받침틀" /></Field>}
         <Field label="제품명"><Input required maxLength={120} value={productName} onChange={event => setProductName(event.target.value)} placeholder="제품명을 입력하세요" /></Field>
-        <Field label="브랜드 (선택)"><Input list={brandListId} maxLength={120} value={brandName} onChange={event => setBrandName(event.target.value)} placeholder="직접 입력 또는 목록 선택" /><datalist id={brandListId}>{brands.map(brand => <option value={brand.name} key={brand.id} />)}</datalist></Field>
+        <Field label="브랜드 (선택)"><Input list={brandListId} maxLength={120} value={brandName} onChange={event => setBrandName(event.target.value)} placeholder="직접 입력 또는 목록 선택" /><datalist id={brandListId}>{brands.flatMap(brand => [<option value={brand.name} key={brand.id} />, ...(brand.aliases ?? []).map(alias => <option value={brand.name} label={alias} key={`${brand.id}:${alias}`} />)])}</datalist></Field>
         <Field label="규격 (선택)"><Input value={specification} maxLength={500} onChange={event => setSpecification(event.target.value)} placeholder="예: 2인용, 10단, 120×160" /></Field>
         <div className={styles.quantityUnit}><Field label="수량"><Input type="number" min={1} step={1} required value={quantity} onChange={event => setQuantity(event.target.value)} /></Field><Field label="단위"><Input list={unitListId} required maxLength={20} value={unit} onChange={event => setUnit(event.target.value)} /><datalist id={unitListId}>{["개", "대", "동", "세트", "점"].map(value => <option value={value} key={value} />)}</datalist></Field></div>
       </div>

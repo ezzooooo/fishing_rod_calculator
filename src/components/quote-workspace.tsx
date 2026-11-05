@@ -9,6 +9,8 @@ import { useApp } from "@/lib/app-context";
 import { useQuoteDraft } from "@/lib/quote-draft-context";
 import { adjustedUnitPrice, availableLengths, buildQuoteText, groupQuoteItems, isEquipmentItem, modeLabel, priceForLength, quoteItemName, quoteItemSpecification, quoteItemUnit, quoteItemsFromDraft, quoteQuantityLabel, quoteSummary, quoteTotals, removeDraftRod, upsertDraftRod, validateQuote, type CalculationMode, type EquipmentQuoteItem, type FishingRod, type QuoteDraft, type QuoteDraftRod, type QuoteItem, type QuoteRecord, type RodQuoteItem } from "@/lib/domain";
 import { formatAppliedRate, formatDateKey, formatDateTime, formatLengthRange, formatMoney } from "@/lib/format";
+import { brandKey, brandSearchText } from "@/lib/brands";
+import type { Brand } from "@/lib/domain";
 import { copyReceiptImage, createReceiptImage, downloadReceiptImage } from "@/lib/receipt-image";
 import { QuoteConflictError } from "@/lib/repository";
 import { Button, EmptyState, Field, Input, Modal, PageHeading, Textarea } from "@/components/ui";
@@ -106,7 +108,7 @@ export function QuoteBuilder() {
 }
 
 type RodLine = { quantity: string; discountRate: number; saleRate: number };
-type RodPickerProps = { mode: CalculationMode; rods: FishingRod[]; brands: { id: string; name: string }[]; groups: QuoteDraftRod[]; initial?: QuoteDraftRod; onClose: () => void; onApply: (group: QuoteDraftRod) => void };
+type RodPickerProps = { mode: CalculationMode; rods: FishingRod[]; brands: Brand[]; groups: QuoteDraftRod[]; initial?: QuoteDraftRod; onClose: () => void; onApply: (group: QuoteDraftRod) => void };
 function RodPicker({ mode, rods, brands, groups, initial, onClose, onApply }: RodPickerProps) {
   const existing = useMemo(() => new Map([...groups, ...(initial ? [initial] : [])].map(group => [group.rod.id, group])), [groups, initial]);
   const catalogue = useMemo(() => [...new Map([...rods, ...[...existing.values()].map(group => group.rod)].map(rod => [rod.id, rod])).values()].sort((a, b) => a.name.localeCompare(b.name, "ko")), [rods, existing]);
@@ -121,7 +123,10 @@ function RodPicker({ mode, rods, brands, groups, initial, onClose, onApply }: Ro
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const selected = catalogue.find(rod => rod.id === selectedId);
-  const filtered = catalogue.filter(rod => `${brandName(rod)} ${rod.name}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const filtered = catalogue.filter(rod => {
+    const brand = brands.find(value => value.id === rod.brandId);
+    return brandKey(`${brandName(rod)} ${rod.name} ${brand ? brandSearchText(brand) : ""}`).includes(brandKey(search.trim()));
+  });
   const lengths = Object.keys(lines).map(Number).sort((a, b) => a - b);
   const selectedOptions = selected && !filtered.some(rod => rod.id === selectedId) ? [selected, ...filtered] : filtered;
   const totalQuantity = lengths.reduce((total, length) => total + Math.max(0, Number(lines[length].quantity) || 0), 0);
@@ -293,14 +298,17 @@ function Receipt({ record }: { record: QuoteRecord }) {
 }
 
 export function QuoteHistory() {
-  const { repository, status } = useApp();
+  const { repository, status, brands } = useApp();
   const [search, setSearch] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<{ records: QuoteRecord[]; ready: boolean; error: string }>({ records: [], ready: false, error: "" });
   useEffect(() => { if (!repository || status !== "authorized") return; return repository.watchQuotes(records => setState({ records, ready: true, error: "" }), error => setState({ records: [], ready: true, error: error.message })); }, [repository, status, attempt]);
   const records = [...state.records].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const query = search.trim().toLocaleLowerCase();
-  const filtered = records.filter(record => [record.title, record.customerName, record.note, modeLabel(record.mode), ...record.items.flatMap(item => [quoteItemName(item), item.brandName, specificationLabel(item), configurationLabel(item), isEquipmentItem(item) ? item.categoryName : "낚시대"])].join(" ").toLocaleLowerCase().includes(query));
+  const query = brandKey(search.trim());
+  const filtered = records.filter(record => brandKey([record.title, record.customerName, record.note, modeLabel(record.mode), ...record.items.flatMap(item => {
+    const brand = brands.find(value => [value.name, ...(value.aliases ?? [])].some(name => brandKey(name) === brandKey(item.brandName)));
+    return [quoteItemName(item), item.brandName, brand ? brandSearchText(brand) : "", specificationLabel(item), configurationLabel(item), isEquipmentItem(item) ? item.categoryName : "낚시대"];
+  })].join(" ")).includes(query));
   return <><PageHeading title="견적 내역" description="기록 당시의 품목·구성과 금액을 확인하고 필요한 내용을 수정하세요." action={<Link className={styles.primaryLink} href="/"><Plus size={17} />새 견적 만들기</Link>} /><div className={`${styles.card} ${styles.historySearchCard}`}><div className={styles.historySearch}><Search size={19} /><Input aria-label="견적 검색" placeholder="고객명, 제품명, 구성품 또는 브랜드명 검색" value={search} onChange={event => setSearch(event.target.value)} /></div></div>{!state.ready ? <div className={styles.loading}>견적 내역을 불러오는 중입니다…</div> : state.error ? <div className={styles.card}><EmptyState title="견적 내역을 불러오지 못했습니다" description={state.error} action={<Button variant="secondary" onClick={() => { setState({ records: [], ready: false, error: "" }); setAttempt(value => value + 1); }}>다시 시도</Button>} /></div> : !records.length ? <div className={styles.card}><EmptyState title="저장된 견적이 없습니다" description="새 견적 만들기에서 낚시대와 용품을 담은 뒤 저장해주세요." action={<Link className={styles.primaryLink} href="/">새 견적 만들기</Link>} /></div> : !filtered.length ? <div className={styles.card}><EmptyState title="검색 결과가 없습니다" description="다른 고객명이나 낚시대 이름으로 검색해주세요." /></div> : <><div className={styles.historyCount}>총 {filtered.length}건 · 최근 기록순</div><div className={styles.historyTable}>
       <div className={styles.historyTableHead} aria-hidden="true"><span>구분</span><span>견적 / 고객</span><span className={styles.historyRodsColumn}>품목</span><span>수량</span><span>견적 금액</span><span>기록 시간</span><span /></div>
       {filtered.map(record => <Link key={record.id} href={`/quotes/detail?id=${encodeURIComponent(record.id)}`} className={styles.historyRow}>

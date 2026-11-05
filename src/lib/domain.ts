@@ -1,5 +1,6 @@
 import { formatAppliedRate, formatLengthRange, formatMoney } from "./format";
 import { normalizeEquipmentQuoteItem, validateEquipmentQuoteItem } from "./equipment";
+import { normalizeBrandAliases } from "./brands";
 
 export type CalculationMode = "purchase" | "sale";
 export type PriceMap = Record<string, number>;
@@ -7,6 +8,7 @@ export type PriceMap = Record<string, number>;
 export interface Brand {
   id: string;
   name: string;
+  aliases?: string[];
   createdAt?: string | null;
   updatedAt?: string | null;
 }
@@ -200,6 +202,7 @@ export function normalizeBrand(
   return {
     id: id ?? text(raw.id),
     name: text(raw.name),
+    aliases: normalizeBrandAliases(text(raw.name), raw.aliases),
     createdAt: normalizeDate(raw.createdAt),
     updatedAt: normalizeDate(raw.updatedAt),
   };

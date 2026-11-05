@@ -28,6 +28,29 @@
 .confirmText p { margin:0; }
 .brandTable { min-width:550px; }
 .brandTable td:first-child { width:38%; }
+.brandAliases { display:block; margin-top:4px; color:var(--muted,#687872); font-size:11px; font-weight:400; line-height:1.6; overflow-wrap:anywhere; }
+.brandReview { margin-top:16px; overflow:hidden; border:1px solid var(--line,#e1e8e1); border-radius:12px; background:var(--paper,#fff); }
+.brandReview > summary { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:46px; padding:12px 16px; color:#365342; font-size:13px; font-weight:600; cursor:pointer; list-style:none; }
+.brandReview > summary::-webkit-details-marker { display:none; }
+.brandReview > summary small { margin-left:8px; color:var(--muted,#687872); font-size:11px; font-weight:400; }
+.brandReview[open] > summary > svg { transform:rotate(180deg); }
+.brandReviewIntro { padding:0 16px 12px; color:var(--muted,#687872); font-size:12px; line-height:1.7; }
+.reviewTable { min-width:670px; table-layout:fixed; }
+.reviewTable th:first-child { width:30%; }
+.reviewTable th:last-child { width:96px; }
+.reviewTable td { vertical-align:top; line-height:1.75; overflow-wrap:anywhere; }
+.sourceLinks { display:flex; flex-direction:column; align-items:flex-start; gap:5px; }
+.sourceLinks a { color:var(--accent,#137f6a); font-size:11px; text-decoration:underline; text-underline-offset:3px; }
+.brandImportSummary { display:flex; flex-wrap:wrap; gap:6px 14px; color:#546e5e; font-size:12px; line-height:1.8; }
+.brandImportSummary strong { color:#235d44; font-weight:650; }
+.brandImportHint { margin:10px 0 14px; color:var(--muted,#687872); font-size:12px; line-height:1.75; }
+.importTableScroll { max-height:42dvh; border:1px solid var(--line,#e1e8e1); border-radius:8px; overscroll-behavior:contain; }
+.importTable { min-width:560px; table-layout:fixed; }
+.importTable thead { position:sticky; top:0; z-index:1; }
+.importTable th:first-child { width:22%; }
+.importTable th:last-child { width:30%; }
+.importTable td { height:45px; line-height:1.7; overflow-wrap:anywhere; }
+.importConflict { color:#a34a3f; font-size:11px; font-weight:550; }
 .brandLabel { display:inline-block; max-width:125px; overflow:hidden; padding:3px 7px; border:1px solid #e7ece5; border-radius:5px; background:#f7f9f4; color:#5f7564; font-size:11px; line-height:1.5; text-overflow:ellipsis; white-space:nowrap; vertical-align:middle; }
 .rodTable { min-width:920px; }
 .rodTable th,.rodTable td { white-space:nowrap; }
@@ -92,6 +115,7 @@
   .toolbar { flex-wrap:wrap; padding:14px; gap:12px; }.toolbar > .search,.filters { width:100%; }.search { width:100%; }.filters { display:grid; grid-template-columns:130px minmax(0,1fr); }.filters select { width:100%; min-height:44px; font-size:13px; }.search input { min-height:44px; font-size:16px; }
   .table thead th { padding:10px 12px; }.table tbody td,.table tbody th { padding:10px 12px; }.brandTable { min-width:0; }.brandTable .optional { display:none; }.brandTable td:first-child { width:auto; overflow-wrap:anywhere; }.brandTable td:nth-child(2),.brandTable th:nth-child(2) { white-space:nowrap; }.brandTable .actionsHeading { width:92px; }
   .actions button { width:44px; min-height:44px; padding:9px; }.actionLabel { display:none; }
+  .brandAliases { max-width:100%; font-size:10px; }.brandReview > summary { align-items:flex-start; padding:13px 14px; }.brandReview > summary small { display:block; margin:4px 0 0; }.brandReviewIntro { padding:0 14px 12px; font-size:11px; }.sourceLinks a { min-height:28px; }.brandImportHint { font-size:11px; }.importTableScroll { max-height:44dvh; }
   .rodTable,.rodTable tbody,.rodTable tr,.rodTable td { display:block; min-width:0; width:100%; }.rodTable thead { display:none; }.rodTable tbody tr { position:relative; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:7px 12px; padding:15px 14px; border-bottom:1px solid #e8eee4; }.rodTable tbody tr:last-child { border-bottom:0; }.rodTable tbody td { height:auto; padding:0; border:0; white-space:normal; }
   .rodBrand,.rodName,.rodLengths { grid-column:1/-1; }.rodBrand { padding-right:96px!important; }.brandLabel { max-width:100%; padding:2px 6px; font-size:10px; }.rodName { padding-right:90px!important; }.rodName button { max-width:100%; font-size:14px; white-space:normal; overflow-wrap:anywhere; }.rodLengths { display:flex!important; align-items:center; color:#6b826f; font-size:11px; }.rodLengths small { margin-left:9px; font-size:10px; }.rodPrice { display:grid!important; gap:3px; text-align:left; margin-top:2px; color:#46684f; font-size:11px; overflow-wrap:anywhere; }.rodPrice:before { content:attr(data-label); color:var(--muted,#687872); font-size:11px; }.rodActions { position:absolute; top:10px; right:8px; width:auto!important; }
   .editor { gap:14px; }.twoColumns { grid-template-columns:1fr; gap:12px; }.editorTools { grid-template-columns:1fr; gap:8px; }.toolDisclosure summary { min-height:44px; padding:12px; }.rangeRow { grid-template-columns:1fr 1fr; gap:8px; }.rangeRow button { grid-column:1/-1; }.customLength { gap:8px; }.rangeRow input,.customLength input,.bulkGrid input,.bulkGrid select { min-height:44px; font-size:16px; }.rangeRow button,.customLength button,.toolContent > button { min-height:44px; font-size:12px; }.bulkGrid { grid-template-columns:1fr; }.toolHint { font-size:11px; }.rangeRow :global(.field-label),.bulkGrid :global(.field-label) { font-size:11px; }

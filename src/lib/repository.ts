@@ -1,6 +1,7 @@
-import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch, type Firestore } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, writeBatch, type Firestore, type Transaction } from 'firebase/firestore';
 import { normalizeBrand, normalizeFishingRod, normalizeQuoteRecord, quoteTotals, validateQuote, type Brand, type FishingRod, type QuoteRecord } from './domain';
 import { cloneEquipmentItem, normalizeEquipmentCategory, normalizeEquipmentProduct, validateEquipmentCategory, validateEquipmentProduct, type EquipmentCategory, type EquipmentProduct } from './equipment';
+import { assertBrandAvailable, brandDocumentId, normalizeBrandAliases, planBrandImport, validateBrandInput, type BrandImportResult, type BrandInput } from './brands';
 
 export type QuoteInput = Pick<QuoteRecord, 'title' | 'note' | 'customerName' | 'mode' | 'items'>;
 type Receive<T> = (value: T) => void;
@@ -16,8 +17,9 @@ export interface AppRepository {
   deleteEquipmentProduct(id: string): Promise<void>;
   watchQuotes(receive: Receive<QuoteRecord[]>, fail: Fail): () => void;
   watchQuote(id: string, receive: Receive<QuoteRecord | null>, fail: Fail): () => void;
-  createBrand(name: string): Promise<void>;
-  updateBrand(id: string, name: string): Promise<void>;
+  createBrand(name: string, aliases?: readonly string[]): Promise<void>;
+  updateBrand(id: string, name: string, aliases?: readonly string[]): Promise<void>;
+  importBrands(entries: readonly BrandInput[]): Promise<BrandImportResult>;
   deleteBrand(id: string): Promise<void>;
   saveRod(rod: FishingRod): Promise<void>;
   deleteRod(id: string): Promise<void>;
@@ -106,13 +108,59 @@ export class FirebaseRepository implements AppRepository {
       try { receive(snapshot.exists() ? normalizeQuoteRecord(snapshot.data(),snapshot.id) : null); } catch(error) { fail(asError(error)); }
     }, fail);
   }
-  async createBrand(name: string) {
+  private async brandTransaction<T>(names: readonly string[], apply: (transaction: Transaction, brands: Brand[]) => T): Promise<T> {
     this.authorize();
-    await addDoc(collection(this.database,'brands'),{name:requiredName(name),createdAt:new Date().toISOString(),updatedAt:null});
+    const existing = await getDocs(collection(this.database, 'brands'));
+    const ids = [...new Set([...existing.docs.map(value => value.id), ...names.map(brandDocumentId)])];
+    return runTransaction(this.database, async transaction => {
+      this.authorize();
+      // Read again inside the transaction, so edits/deletions since preview cannot be overwritten.
+      const latest = await Promise.all(ids.map(id => transaction.get(doc(this.database, 'brands', documentId(id)))));
+      return apply(transaction, latest.filter(value => value.exists()).map(value => normalizeBrand(value.data()!, value.id)));
+    });
   }
-  async updateBrand(id: string, name: string) {
+  async createBrand(name: string, aliases?: readonly string[]) {
     this.authorize();
-    await updateDoc(doc(this.database,'brands',documentId(id)),{name:requiredName(name),updatedAt:new Date().toISOString()});
+    const value = validateBrandInput({ name, aliases });
+    await this.brandTransaction([value.name], (transaction, brands) => {
+      assertBrandAvailable(brands, value);
+      const id = brandDocumentId(value.name);
+      if (brands.some(brand => brand.id === id)) throw new Error('브랜드 주소가 기존 데이터와 겹칩니다. 이름을 확인해주세요.');
+      transaction.set(doc(this.database, 'brands', id), { ...value, createdAt: new Date().toISOString(), updatedAt: null });
+    });
+  }
+  async updateBrand(id: string, name: string, aliases?: readonly string[]) {
+    this.authorize(); documentId(id);
+    validateBrandInput({ name, aliases });
+    await this.brandTransaction([name], (transaction, brands) => {
+      const previous = brands.find(brand => brand.id === id);
+      if (!previous) throw new Error('삭제된 브랜드입니다. 목록을 새로 불러와주세요.');
+      const value = validateBrandInput({ name, aliases: [...(aliases ?? previous.aliases ?? []), ...(previous.name !== name.trim() ? [previous.name] : [])] });
+      assertBrandAvailable(brands, value, id);
+      transaction.update(doc(this.database, 'brands', id), { ...value, updatedAt: new Date().toISOString() });
+    });
+  }
+  async importBrands(entries: readonly BrandInput[]): Promise<BrandImportResult> {
+    this.authorize();
+    const inputs = entries.map(validateBrandInput);
+    // Validate the complete request before opening the transaction or writing any document.
+    planBrandImport([], inputs);
+    return this.brandTransaction(inputs.map(value => value.name), (transaction, brands) => {
+      const plan = planBrandImport(brands, inputs);
+      if (plan.conflicts) throw new Error(`브랜드 이름 또는 별칭이 겹치는 항목 ${plan.conflicts}개가 있습니다. 미리보기를 다시 확인해주세요.`);
+      const now = new Date().toISOString();
+      for (const entry of plan.entries) {
+        if (entry.action === 'unchanged') continue;
+        const value = { name: entry.name, aliases: entry.aliases, updatedAt: now };
+        if (entry.action === 'update' && entry.id) transaction.update(doc(this.database, 'brands', entry.id), value);
+        else if (entry.action === 'create') {
+          const id = brandDocumentId(entry.name);
+          if (brands.some(brand => brand.id === id)) throw new Error('브랜드 주소가 기존 데이터와 겹칩니다. 미리보기를 다시 확인해주세요.');
+          transaction.set(doc(this.database, 'brands', id), { ...value, createdAt: now });
+        }
+      }
+      return { created: plan.created, updated: plan.updated, unchanged: plan.unchanged };
+    });
   }
   async deleteBrand(id: string) { this.authorize(); await deleteDoc(doc(this.database,'brands',documentId(id))); }
   async saveRod(rod: FishingRod) { this.authorize(); await setDoc(doc(this.database,'fishing_rods',documentId(rod.id)),rodData(rod)); }
@@ -134,7 +182,7 @@ export class FirebaseRepository implements AppRepository {
     }
   }
   async replaceBrands(brands: Brand[]) {
-    const values=brands.map(value=>({...value,name:requiredName(value.name),createdAt:value.createdAt??null,updatedAt:value.updatedAt??null}));
+    const values=brands.map(value=>({...value,name:requiredName(value.name),aliases:normalizeBrandAliases(value.name,value.aliases),createdAt:value.createdAt??null,updatedAt:value.updatedAt??null}));
     await this.replace('brands',values);
   }
   async replaceRods(rods: FishingRod[]) { await this.replace('fishing_rods',rods.map(rodData)); }

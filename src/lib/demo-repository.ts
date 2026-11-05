@@ -1,6 +1,7 @@
 import { normalizeBrand, normalizeFishingRod, normalizeQuoteRecord, quoteTotals, validateQuote, type Brand, type FishingRod, type QuoteRecord } from './domain';
 import { QuoteConflictError, type AppRepository, type QuoteInput } from './repository';
 import { cloneEquipmentItem, createEquipmentPreset, normalizeEquipmentCategory, normalizeEquipmentProduct, validateEquipmentCategory, validateEquipmentProduct, type EquipmentCategory, type EquipmentProduct } from './equipment';
+import { assertBrandAvailable, brandDocumentId, planBrandImport, validateBrandInput, type BrandInput } from './brands';
 
 function demoEquipmentCategories(): EquipmentCategory[] {
   return (['tent','platform','stand'] as const).map((kind,index)=>{
@@ -23,14 +24,38 @@ export class DemoRepository implements AppRepository {
   private listeners=new Set<()=>void>();
   private emit(){this.listeners.forEach(listener=>listener());}
   private watch(receive:()=>void){ this.listeners.add(receive);queueMicrotask(()=>{if(this.listeners.has(receive))receive();});return()=>{this.listeners.delete(receive);}; }
-  watchBrands(receive:(value:Brand[])=>void){return this.watch(()=>receive([...this.brands].sort((a,b)=>a.name.localeCompare(b.name,'ko'))));}
+  watchBrands(receive:(value:Brand[])=>void){return this.watch(()=>receive(this.brands.map(brand=>({...brand,aliases:[...(brand.aliases??[])]})).sort((a,b)=>a.name.localeCompare(b.name,'ko'))));}
   watchRods(receive:(value:FishingRod[])=>void){return this.watch(()=>receive([...this.rods].sort((a,b)=>a.name.localeCompare(b.name,'ko'))));}
   watchEquipmentCategories(receive:(value:EquipmentCategory[])=>void){return this.watch(()=>receive(this.equipmentCategories.map(value=>normalizeEquipmentCategory(value as unknown as Record<string,unknown>)).sort((a,b)=>a.name.localeCompare(b.name,'ko'))));}
   watchEquipmentProducts(receive:(value:EquipmentProduct[])=>void){return this.watch(()=>receive(this.equipmentProducts.map(value=>normalizeEquipmentProduct(value as unknown as Record<string,unknown>)).sort((a,b)=>a.name.localeCompare(b.name,'ko'))));}
   watchQuotes(receive:(value:QuoteRecord[])=>void){return this.watch(()=>receive(this.quotes.map(cloneQuote).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))));}
   watchQuote(id:string,receive:(value:QuoteRecord|null)=>void){return this.watch(()=>{const quote=this.quotes.find(quote=>quote.id===id);receive(quote?cloneQuote(quote):null);} );}
-  async createBrand(name:string){this.brands.push(normalizeBrand({id:crypto.randomUUID(),name:name.trim(),createdAt:new Date().toISOString()}));this.emit();}
-  async updateBrand(id:string,name:string){this.brands=this.brands.map(brand=>brand.id===id?{...brand,name:name.trim(),updatedAt:new Date().toISOString()}:brand);this.emit();}
+  async createBrand(name:string,aliases?:readonly string[]){const value=validateBrandInput({name,aliases});assertBrandAvailable(this.brands,value);this.brands.push(normalizeBrand({id:brandDocumentId(value.name),...value,createdAt:new Date().toISOString()}));this.emit();}
+  async updateBrand(id:string,name:string,aliases?:readonly string[]){
+    const previous=this.brands.find(brand=>brand.id===id);
+    if(!previous)throw new Error('삭제된 브랜드입니다. 목록을 새로 불러와주세요.');
+    const value=validateBrandInput({name,aliases:[...(aliases??previous.aliases??[]),...(previous.name!==name.trim()?[previous.name]:[])]});
+    assertBrandAvailable(this.brands,value,id);
+    this.brands=this.brands.map(brand=>brand.id===id?{...brand,...value,updatedAt:new Date().toISOString()}:brand);this.emit();
+  }
+  async importBrands(entries:readonly BrandInput[]){
+    const plan=planBrandImport(this.brands,entries);
+    if(plan.conflicts)throw new Error(`브랜드 이름 또는 별칭이 겹치는 항목 ${plan.conflicts}개가 있습니다. 미리보기를 다시 확인해주세요.`);
+    const now=new Date().toISOString();
+    const next=[...this.brands];
+    for(const entry of plan.entries){
+      if(entry.action==='unchanged')continue;
+      const value={name:entry.name,aliases:[...entry.aliases],updatedAt:now};
+      if(entry.action==='update'&&entry.id){const index=next.findIndex(brand=>brand.id===entry.id);next[index]={...next[index],...value};}
+      else if(entry.action==='create'){
+        const id=brandDocumentId(entry.name);
+        if(next.some(brand=>brand.id===id))throw new Error('브랜드 주소가 기존 데이터와 겹칩니다.');
+        next.push({...value,id,createdAt:now});
+      }
+    }
+    this.brands=next;this.emit();
+    return {created:plan.created,updated:plan.updated,unchanged:plan.unchanged};
+  }
   async deleteBrand(id:string){this.brands=this.brands.filter(brand=>brand.id!==id);this.emit();}
   async saveRod(rod:FishingRod){const value=normalizeFishingRod(rod as unknown as Record<string,unknown>);this.rods=[...this.rods.filter(item=>item.id!==rod.id),value];this.emit();}
   async deleteRod(id:string){this.rods=this.rods.filter(rod=>rod.id!==id);this.emit();}
@@ -38,7 +63,7 @@ export class DemoRepository implements AppRepository {
   async deleteEquipmentCategory(id:string){this.equipmentCategories=this.equipmentCategories.filter(value=>value.id!==id);this.emit();}
   async saveEquipmentProduct(value:EquipmentProduct){validateEquipmentProduct(value);this.equipmentProducts=[...this.equipmentProducts.filter(item=>item.id!==value.id),normalizeEquipmentProduct(value as unknown as Record<string,unknown>)];this.emit();}
   async deleteEquipmentProduct(id:string){this.equipmentProducts=this.equipmentProducts.filter(value=>value.id!==id);this.emit();}
-  async replaceBrands(brands:Brand[]){this.brands=brands;this.emit();}
+  async replaceBrands(brands:Brand[]){this.brands=brands.map(brand=>({...brand,...validateBrandInput(brand)}));this.emit();}
   async replaceRods(rods:FishingRod[]){this.rods=rods;this.emit();}
   async createQuote(input:QuoteInput){validateQuote(input);const id=crypto.randomUUID();this.quotes.push(cloneQuote({...input,...quoteTotals(input.items),id,createdBy:'demo',createdAt:new Date().toISOString(),updatedAt:null,revision:0}));this.emit();return id;}
   async updateQuote(record:QuoteRecord){

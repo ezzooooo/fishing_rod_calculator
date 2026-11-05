@@ -7,6 +7,7 @@ import { useApp } from "@/lib/app-context";
 import { useEquipmentCatalog } from "@/lib/equipment-context";
 import { createEquipmentPreset, mergeEquipmentOptionGroups, validateEquipmentCategory, validateEquipmentProduct, type EquipmentCategory, type EquipmentOptionGroup, type EquipmentProduct } from "@/lib/equipment";
 import { formatMoney } from "@/lib/format";
+import { brandKey, brandSearchText } from "@/lib/brands";
 import { RodManagement } from "@/components/catalog-workspace";
 import { EquipmentOptionEditor } from "@/components/equipment-option-editor";
 import { Button, EmptyState, Field, Input, Modal, PageHeading } from "@/components/ui";
@@ -153,7 +154,10 @@ export function EquipmentManagement() {
   const [error, setError] = useState("");
   const brandName = (id: string) => brands.find(value => value.id === id)?.name ?? "브랜드 미지정";
   const categoryName = (id: string) => categories.find(value => value.id === id)?.name ?? "분류 미지정";
-  const filtered = products.filter(product => (!categoryFilter || product.categoryId === categoryFilter) && `${product.name} ${product.specification} ${brandName(product.brandId)} ${categoryName(product.categoryId)}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const filtered = products.filter(product => {
+    const brand = brands.find(value => value.id === product.brandId);
+    return (!categoryFilter || product.categoryId === categoryFilter) && brandKey(`${product.name} ${product.specification} ${brand ? brandSearchText(brand) : ""} ${categoryName(product.categoryId)}`).includes(brandKey(search.trim()));
+  });
   const available = !!repository && !loading && !catalogError;
   async function remove() {
     if (!repository || !deleting || busy) return;
