@@ -1,6 +1,7 @@
 import { formatAppliedRate, formatLengthRange, formatMoney } from "./format";
 import { normalizeEquipmentQuoteItem, validateEquipmentQuoteItem } from "./equipment";
 import { normalizeBrandAliases } from "./brands";
+import { normalizePurchaseOutcome, type PurchaseOutcome } from "./purchase-outcome";
 
 export type CalculationMode = "purchase" | "sale";
 export type PriceMap = Record<string, number>;
@@ -114,6 +115,7 @@ export interface QuoteRecord {
   revision: number;
   totalQuantity: number;
   totalPrice: number;
+  purchaseOutcome?: PurchaseOutcome;
 }
 
 export interface QuoteDraftRod {
@@ -433,6 +435,7 @@ export function normalizeQuoteRecord(
     revision: numeric(raw.revision),
     totalQuantity: totals.totalQuantity,
     totalPrice: totals.totalPrice,
+    purchaseOutcome: normalizePurchaseOutcome(raw.purchaseOutcome),
   };
 }
 

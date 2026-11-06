@@ -7,6 +7,7 @@ import { quoteBrowserFlow } from './quote-browser-flow';
 import { catalogBrowserFlow } from './catalog-browser-flow';
 import { brandBrowserFlow } from './brand-browser-flow';
 import { equipmentDraftBrowserFlow } from './equipment-draft-browser-flow';
+import { purchaseOutcomeBrowserFlow } from './purchase-outcome-browser-flow';
 
 const require=createRequire(import.meta.url);
 const port=Number(process.env.FISHJOONGO_TEST_PORT||3100);
@@ -60,6 +61,13 @@ try{
   await equipmentDraftBrowserFlow(equipmentPage);
   await equipmentContext.close();
   console.log('PASS: category draft confirmation, repeat import, preserved catalogue prices and explicit unknown component pricing');
+  const purchaseContext=await browser.newContext({baseURL:origin,viewport:{width:1366,height:768}});
+  const purchasePage=await purchaseContext.newPage();
+  purchasePage.on('pageerror',error=>errors.push(error.message));
+  purchasePage.on('request',request=>{if(/firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com/.test(request.url()))backendRequests.push(request.url());});
+  await purchaseOutcomeBrowserFlow(purchasePage);
+  await purchaseContext.close();
+  console.log('PASS: purchase statuses, partial quantities, independent actual amounts, source snapshots and responsive result editing');
   assert.deepEqual(backendRequests,[],'Preview must never request the live Firebase backend');
   assert.deepEqual(errors,[],'Browser runtime errors');
   console.log('PASS: no runtime errors and no live Firebase requests');

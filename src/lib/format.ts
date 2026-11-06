@@ -43,6 +43,21 @@ export function formatDateTime(value: string | Date | null | undefined): string 
   return `${result.year}.${result.month}.${result.day} ${result.hour}:${result.minute}`;
 }
 
+export function formatDate(value: string | Date | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (!Number.isFinite(date.getTime())) return "—";
+  const result = parts(date);
+  return `${result.year}.${result.month}.${result.day}`;
+}
+
+export function formatDateInput(value: string | Date = new Date()): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (!Number.isFinite(date.getTime())) throw new RangeError("날짜가 올바르지 않습니다.");
+  const result = parts(date);
+  return `${result.year}-${result.month}-${result.day}`;
+}
+
 export function formatDateKey(value: string | Date = new Date()): string {
   const date = typeof value === "string" ? new Date(value) : value;
   if (!Number.isFinite(date.getTime())) throw new RangeError("날짜가 올바르지 않습니다.");

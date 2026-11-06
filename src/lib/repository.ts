@@ -3,6 +3,7 @@ import { normalizeBrand, normalizeFishingRod, normalizeQuoteRecord, quoteTotals,
 import { cloneEquipmentItem, normalizeEquipmentCategory, normalizeEquipmentProduct, validateEquipmentCategory, validateEquipmentProduct, type EquipmentCategory, type EquipmentProduct } from './equipment';
 import { activeBrands, assertBrandAvailable, assertBrandDeletable, brandDocumentId, mergedBrandIdsFor, normalizeBrandAliases, planBrandImport, resolveBrandId, validateBrandInput, type BrandImportResult, type BrandInput } from './brands';
 import { planEquipmentCategoryImport, type EquipmentCategoryImportAliases, type EquipmentCategoryImportResult } from './equipment-category-import';
+import { buildPurchaseOutcome, emptyPurchaseOutcome, type PurchaseOutcomeInput } from './purchase-outcome';
 
 export type QuoteInput = Pick<QuoteRecord, 'title' | 'note' | 'customerName' | 'mode' | 'items'>;
 type Receive<T> = (value: T) => void;
@@ -29,6 +30,7 @@ export interface AppRepository {
   replaceRods(rods: FishingRod[]): Promise<void>;
   createQuote(input: QuoteInput): Promise<string>;
   updateQuote(record: QuoteRecord): Promise<void>;
+  updatePurchaseOutcome(record: QuoteRecord, input: PurchaseOutcomeInput): Promise<void>;
   deleteQuote(id: string): Promise<void>;
 }
 export class QuoteConflictError extends Error {
@@ -246,7 +248,7 @@ export class FirebaseRepository implements AppRepository {
   async replaceRods(rods: FishingRod[]) { await this.replace('fishing_rods',rods.map(rodData)); }
   async createQuote(input: QuoteInput) {
     const uid=this.authorize();
-    const reference=await addDoc(collection(this.database,'quote_records'),{...quoteData(input),createdBy:uid,createdAt:serverTimestamp(),clientCreatedAt:new Date().toISOString(),updatedAt:null,revision:0});
+    const reference=await addDoc(collection(this.database,'quote_records'),{...quoteData(input),...(input.mode==='purchase'?{purchaseOutcome:emptyPurchaseOutcome('in_progress')}:{}),createdBy:uid,createdAt:serverTimestamp(),clientCreatedAt:new Date().toISOString(),updatedAt:null,revision:0});
     return reference.id;
   }
   async updateQuote(record: QuoteRecord) {
@@ -258,6 +260,20 @@ export class FirebaseRepository implements AppRepository {
       if(!previous.exists()) throw new Error('삭제된 견적입니다. 견적 내역을 다시 확인해주세요.');
       if(Number(previous.data().revision??0)!==record.revision) throw new QuoteConflictError();
       transaction.update(reference,{...data,revision:record.revision+1,updatedAt:serverTimestamp(),clientUpdatedAt:new Date().toISOString()});
+    });
+  }
+  async updatePurchaseOutcome(record: QuoteRecord, input: PurchaseOutcomeInput) {
+    const uid=this.authorize();
+    const reference=doc(this.database,'quote_records',documentId(record.id));
+    await runTransaction(this.database,async transaction=>{
+      if(this.authorize()!==uid)throw new Error('로그인한 직원이 변경되었습니다. 다시 시도해주세요.');
+      const previous=await transaction.get(reference);
+      if(this.authorize()!==uid)throw new Error('로그인한 직원이 변경되었습니다. 다시 시도해주세요.');
+      if(!previous.exists())throw new Error('삭제된 견적입니다. 견적 내역을 다시 확인해주세요.');
+      if(Number(previous.data().revision??0)!==record.revision)throw new QuoteConflictError();
+      const latest=normalizeQuoteRecord(previous.data(),previous.id);
+      const outcome=buildPurchaseOutcome(latest,input);
+      transaction.update(reference,{purchaseOutcome:{...outcome,updatedAt:serverTimestamp(),updatedBy:uid},revision:record.revision+1,updatedAt:serverTimestamp(),clientUpdatedAt:new Date().toISOString()});
     });
   }
   async deleteQuote(id: string) { this.authorize(); await deleteDoc(doc(this.database,'quote_records',documentId(id))); }

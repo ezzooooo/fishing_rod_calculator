@@ -3,6 +3,7 @@ import { QuoteConflictError, type AppRepository, type QuoteInput } from './repos
 import { cloneEquipmentItem, createEquipmentPreset, normalizeEquipmentCategory, normalizeEquipmentProduct, validateEquipmentCategory, validateEquipmentProduct, type EquipmentCategory, type EquipmentProduct } from './equipment';
 import { activeBrands, assertBrandAvailable, assertBrandDeletable, brandDocumentId, mergedBrandIdsFor, planBrandImport, resolveBrandId, validateBrandInput, type BrandInput } from './brands';
 import { planEquipmentCategoryImport, type EquipmentCategoryImportAliases } from './equipment-category-import';
+import { buildPurchaseOutcome, emptyPurchaseOutcome, purchaseOutcomeFor, type PurchaseOutcomeInput } from './purchase-outcome';
 
 function demoEquipmentCategories(): EquipmentCategory[] {
   return (['tent','platform','stand'] as const).map((kind,index)=>{
@@ -10,7 +11,7 @@ function demoEquipmentCategories(): EquipmentCategory[] {
     return {...category,id:`equipment-category-${kind}`,optionGroups:category.optionGroups.map(group=>({...group,choices:group.choices.map((choice,choiceIndex)=>({...choice,purchasePrice:choice.id==='missing'?0:(index+1)*(choiceIndex+1)*5000,salePrice:choice.id==='missing'?0:(index+1)*(choiceIndex+1)*8000}))}))};
   });
 }
-const cloneQuote=(record:QuoteRecord):QuoteRecord=>({...record,items:record.items.map(item=>item.kind==='equipment'?cloneEquipmentItem(item):({...item}))});
+const cloneQuote=(record:QuoteRecord):QuoteRecord=>({...record,items:record.items.map(item=>item.kind==='equipment'?cloneEquipmentItem(item):({...item})),...(record.purchaseOutcome?{purchaseOutcome:purchaseOutcomeFor(record)}:{})});
 
 // This repository is reachable only in explicitly enabled development previews.
 export class DemoRepository implements AppRepository {
@@ -90,12 +91,20 @@ export class DemoRepository implements AppRepository {
   async deleteEquipmentProduct(id:string){this.equipmentProducts=this.equipmentProducts.filter(value=>value.id!==id);this.emit();}
   async replaceBrands(brands:Brand[]){this.brands=brands.map(brand=>({...brand,...validateBrandInput(brand)}));this.emit();}
   async replaceRods(rods:FishingRod[]){this.rods=rods;this.emit();}
-  async createQuote(input:QuoteInput){validateQuote(input);const id=crypto.randomUUID();this.quotes.push(cloneQuote({...input,...quoteTotals(input.items),id,createdBy:'demo',createdAt:new Date().toISOString(),updatedAt:null,revision:0}));this.emit();return id;}
+  async createQuote(input:QuoteInput){validateQuote(input);const id=crypto.randomUUID();this.quotes.push(cloneQuote({...input,...quoteTotals(input.items),...(input.mode==='purchase'?{purchaseOutcome:emptyPurchaseOutcome('in_progress')}:{}),id,createdBy:'demo',createdAt:new Date().toISOString(),updatedAt:null,revision:0}));this.emit();return id;}
   async updateQuote(record:QuoteRecord){
     validateQuote(record);const previous=this.quotes.find(quote=>quote.id===record.id);
     if(!previous)throw new Error('삭제된 견적입니다.');
     if(previous.revision!==record.revision)throw new QuoteConflictError();
-    this.quotes=this.quotes.map(quote=>quote.id===record.id?cloneQuote({...record,...quoteTotals(record.items),createdAt:previous.createdAt,createdBy:previous.createdBy,revision:previous.revision+1,updatedAt:new Date().toISOString()}):quote);this.emit();
+    this.quotes=this.quotes.map(quote=>quote.id===record.id?cloneQuote({...record,...quoteTotals(record.items),purchaseOutcome:previous.purchaseOutcome,createdAt:previous.createdAt,createdBy:previous.createdBy,revision:previous.revision+1,updatedAt:new Date().toISOString()}):quote);this.emit();
+  }
+  async updatePurchaseOutcome(record:QuoteRecord,input:PurchaseOutcomeInput){
+    const previous=this.quotes.find(quote=>quote.id===record.id);
+    if(!previous)throw new Error('삭제된 견적입니다.');
+    if(previous.revision!==record.revision)throw new QuoteConflictError();
+    const now=new Date().toISOString();
+    const purchaseOutcome={...buildPurchaseOutcome(previous,input),updatedAt:now,updatedBy:'demo-staff'};
+    this.quotes=this.quotes.map(quote=>quote.id===record.id?cloneQuote({...previous,purchaseOutcome,revision:previous.revision+1,updatedAt:now}):quote);this.emit();
   }
   async deleteQuote(id:string){this.quotes=this.quotes.filter(quote=>quote.id!==id);this.emit();}
 }

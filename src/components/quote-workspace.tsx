@@ -13,6 +13,8 @@ import { brandKey, brandSearchText, resolveBrandId } from "@/lib/brands";
 import type { Brand } from "@/lib/domain";
 import { copyReceiptImage, createReceiptImage, downloadReceiptImage } from "@/lib/receipt-image";
 import { QuoteConflictError } from "@/lib/repository";
+import { purchaseOutcomeFor, purchaseStatusLabel } from "@/lib/purchase-outcome";
+import { PurchaseOutcomePanel, PurchaseStatusBadge } from "@/components/purchase-outcome";
 import { Button, EmptyState, Field, Input, Modal, PageHeading, Textarea } from "@/components/ui";
 import { EquipmentPicker } from "@/components/equipment-picker";
 import styles from "./quote-workspace.module.css";
@@ -324,19 +326,24 @@ function Receipt({ record }: { record: QuoteRecord }) {
 export function QuoteHistory() {
   const { repository, status, brands } = useApp();
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<{ records: QuoteRecord[]; ready: boolean; error: string }>({ records: [], ready: false, error: "" });
   useEffect(() => { if (!repository || status !== "authorized") return; return repository.watchQuotes(records => setState({ records, ready: true, error: "" }), error => setState({ records: [], ready: true, error: error.message })); }, [repository, status, attempt]);
   const records = [...state.records].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const query = brandKey(search.trim());
-  const filtered = records.filter(record => brandKey([record.title, record.customerName, record.note, modeLabel(record.mode), ...record.items.flatMap(item => {
-    const brand = brands.find(value => [value.name, ...(value.aliases ?? [])].some(name => brandKey(name) === brandKey(item.brandName)));
-    return [quoteItemName(item), item.brandName, brand ? brandSearchText(brand) : "", specificationLabel(item), configurationLabel(item), isEquipmentItem(item) ? item.categoryName : "낚시대"];
-  })].join(" ")).includes(query));
-  return <><PageHeading title="견적 내역" description="기록 당시의 품목·구성과 금액을 확인하고 필요한 내용을 수정하세요." action={<Link className={styles.primaryLink} href="/"><Plus size={17} />새 견적 만들기</Link>} /><div className={`${styles.card} ${styles.historySearchCard}`}><div className={styles.historySearch}><Search size={19} /><Input aria-label="견적 검색" placeholder="고객명, 제품명, 구성품 또는 브랜드명 검색" value={search} onChange={event => setSearch(event.target.value)} /></div></div>{!state.ready ? <div className={styles.loading}>견적 내역을 불러오는 중입니다…</div> : state.error ? <div className={styles.card}><EmptyState title="견적 내역을 불러오지 못했습니다" description={state.error} action={<Button variant="secondary" onClick={() => { setState({ records: [], ready: false, error: "" }); setAttempt(value => value + 1); }}>다시 시도</Button>} /></div> : !records.length ? <div className={styles.card}><EmptyState title="저장된 견적이 없습니다" description="새 견적 만들기에서 낚시대와 용품을 담은 뒤 저장해주세요." action={<Link className={styles.primaryLink} href="/">새 견적 만들기</Link>} /></div> : !filtered.length ? <div className={styles.card}><EmptyState title="검색 결과가 없습니다" description="다른 고객명이나 낚시대 이름으로 검색해주세요." /></div> : <><div className={styles.historyCount}>총 {filtered.length}건 · 최근 기록순</div><div className={styles.historyTable}>
-      <div className={styles.historyTableHead} aria-hidden="true"><span>구분</span><span>견적 / 고객</span><span className={styles.historyRodsColumn}>품목</span><span>수량</span><span>견적 금액</span><span>기록 시간</span><span /></div>
+  const filtered = records.filter(record => {
+    const outcome = record.mode === "purchase" ? purchaseOutcomeFor(record) : null;
+    if (statusFilter !== "all" && outcome?.status !== statusFilter) return false;
+    return brandKey([record.title, record.customerName, record.note, modeLabel(record.mode), ...(outcome ? [purchaseStatusLabel(outcome.status), outcome.reason, outcome.note] : []), ...record.items.flatMap(item => {
+      const brand = brands.find(value => [value.name, ...(value.aliases ?? [])].some(name => brandKey(name) === brandKey(item.brandName)));
+      return [quoteItemName(item), item.brandName, brand ? brandSearchText(brand) : "", specificationLabel(item), configurationLabel(item), isEquipmentItem(item) ? item.categoryName : "낚시대"];
+    })].join(" ")).includes(query);
+  });
+  return <><PageHeading title="견적 내역" description="견적과 실제 매입 결과를 함께 확인하고, 진행 상태별로 찾아보세요." action={<Link className={styles.primaryLink} href="/"><Plus size={17} />새 견적 만들기</Link>} /><div className={`${styles.card} ${styles.historySearchCard}`}><div className={styles.historyFilters}><div className={styles.historySearch}><Search size={19} /><Input aria-label="견적 검색" placeholder="고객명, 제품명, 구성품 또는 브랜드명 검색" value={search} onChange={event => setSearch(event.target.value)} /></div><select className="control" aria-label="매입 상태 필터" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="all">매입 상태 전체</option>{(["unconfirmed", "in_progress", "completed", "partial", "not_completed"] as const).map(value => <option key={value} value={value}>{purchaseStatusLabel(value)}</option>)}</select></div></div>{!state.ready ? <div className={styles.loading}>견적 내역을 불러오는 중입니다…</div> : state.error ? <div className={styles.card}><EmptyState title="견적 내역을 불러오지 못했습니다" description={state.error} action={<Button variant="secondary" onClick={() => { setState({ records: [], ready: false, error: "" }); setAttempt(value => value + 1); }}>다시 시도</Button>} /></div> : !records.length ? <div className={styles.card}><EmptyState title="저장된 견적이 없습니다" description="새 견적 만들기에서 낚시대와 용품을 담은 뒤 저장해주세요." action={<Link className={styles.primaryLink} href="/">새 견적 만들기</Link>} /></div> : !filtered.length ? <div className={styles.card}><EmptyState title="검색 결과가 없습니다" description="검색어나 매입 상태 필터를 바꿔보세요." /></div> : <><div className={styles.historyCount}>총 {filtered.length}건 · 최근 기록순</div><div className={styles.historyTable}>
+      <div className={styles.historyTableHead} aria-hidden="true"><span>매입 상태</span><span>견적 / 고객</span><span className={styles.historyRodsColumn}>품목</span><span>수량</span><span>견적 금액</span><span>기록 시간</span><span /></div>
       {filtered.map(record => <Link key={record.id} href={`/quotes/detail?id=${encodeURIComponent(record.id)}`} className={styles.historyRow}>
-        <span className={`${styles.badge} ${record.mode === "sale" ? styles.saleBadge : ""}`}>{modeLabel(record.mode)}</span>
+        <div className={styles.historyStatus}>{record.mode === "purchase" ? <PurchaseStatusBadge record={record}/> : <span className={`${styles.badge} ${styles.saleBadge}`}>판매</span>}</div>
         <div className={styles.historyIdentity}><h2>{record.title}</h2><p>{record.customerName ? `고객 ${record.customerName}` : "고객명 미입력"}</p></div>
         <p className={styles.historyRodsColumn}>{[...new Set(record.items.map(rodLabel))].join(", ")}</p>
         <span className={styles.historyQuantity}>{groupQuoteItems(record.items).length}종 · {quoteQuantityLabel(record.items)}</span>
@@ -421,6 +428,7 @@ function QuoteDetailContent({ id }: { id: string }) {
         <section className={styles.card}>
           {editing ? <><Field label="견적 제목"><Input value={record.title} maxLength={120} required onChange={event => setEditing(current => current && ({ ...current, title: event.target.value }))} /></Field><div className={styles.customerGrid}><Field label="고객명 (선택)"><Input value={record.customerName} maxLength={120} onChange={event => setEditing(current => current && ({ ...current, customerName: event.target.value }))} /></Field><Field label="견적 구분"><select className="control" value={record.mode} onChange={event => { const mode = event.target.value as CalculationMode; setEditing(current => current && ({ ...current, mode, items: current.items.map(item => isEquipmentItem(item) ? item : ({ ...item, finalUnitPrice: adjustedUnitPrice(item.unitPrice, item.rate, mode) })) })); }}><option value="purchase">매입</option><option value="sale">판매</option></select></Field></div><p className={styles.help}>낚시대는 저장된 기준 단가와 적용율로 다시 계산하며, 용품은 입력한 견적금액을 유지합니다.</p></> : <><span className={styles.badge}>{modeLabel(record.mode)} 견적</span><h2 className={styles.detailTitle}>{record.title}</h2>{record.customerName && <p className={styles.customerName}>고객 {record.customerName}</p>}</>}
         </section>
+        <PurchaseOutcomePanel record={record} disabled={!!editing || busy}/>
         <section className={styles.detailItemsSection}>
           <div className={styles.sectionHeading}><h2>견적 항목</h2><span className={styles.count}>{groups.length}종 · {record.items.length}개 항목</span>{editing && <div className={`${styles.actions} ${styles.addButton}`}><Button variant="secondary" onClick={() => setItemEditor({ index: -1 })} disabled={busy || record.items.length >= 500}><Plus size={16} />낚시대 항목 추가</Button><Button variant="secondary" onClick={() => setEquipmentEditor({ index: -1 })} disabled={busy || record.items.length >= 500}><Plus size={16} />용품 추가</Button></div>}</div>
           {!record.items.length ? <div className={styles.card}><EmptyState title="견적 항목을 추가해주세요" /></div> : <div className={styles.detailTableScroll} role="region" aria-label="견적 항목 표 스크롤" tabIndex={0}>
