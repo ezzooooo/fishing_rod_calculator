@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import type { Page } from "playwright";
+import type { Locator, Page } from "playwright";
 
 /** Purchase-result edits use a separate, development-only in-memory repository. */
 export async function purchaseOutcomeBrowserFlow(page: Page): Promise<void> {
@@ -17,6 +17,14 @@ export async function purchaseOutcomeBrowserFlow(page: Page): Promise<void> {
   async function noHorizontalOverflow(label: string) {
     const dimensions = await page.evaluate(() => ({ content: document.documentElement.scrollWidth, viewport: window.innerWidth }));
     assert.ok(dimensions.content <= dimensions.viewport + 1, `${label}: horizontal overflow ${dimensions.content} > ${dimensions.viewport}`);
+  }
+  async function historyAmount(link: Locator, primary: string, original?: string, caption?: string) {
+    const amount = link.getByTestId("history-amount");
+    assert.equal(await amount.locator("strong").innerText(), primary, "The primary list amount must match the actual result when recorded");
+    if (original) assert.equal(await amount.locator("small").innerText(), `견적 ${original}`, "The original quotation remains available as a secondary amount");
+    else assert.equal(await amount.locator("small").count(), 0, "Unfinished quotes should show only their quoted amount");
+    if (caption) assert.match(await amount.innerText(), new RegExp(caption));
+    else assert.doesNotMatch(await amount.innerText(), /최종 매입금액|실제 매입금액/);
   }
   async function openResult() {
     await resultPanel().getByRole("button", { name: /매입 결과 (기록|수정)/ }).click();
@@ -39,6 +47,7 @@ export async function purchaseOutcomeBrowserFlow(page: Page): Promise<void> {
   await page.goto(`${origin}/quotes`);
   await page.getByRole("heading", { name: "견적 내역", exact: true }).waitFor();
   assert.match(await sampleLink().innerText(), /미확인/, "Existing records without a result must remain unconfirmed");
+  await historyAmount(sampleLink(), "210,000원");
   const statusFilter = page.getByLabel("매입 상태 필터", { exact: true });
   await statusFilter.selectOption("in_progress");
   assert.equal(await sampleLink().count(), 0, "Old quotes must not become active consultations automatically");
@@ -80,6 +89,7 @@ export async function purchaseOutcomeBrowserFlow(page: Page): Promise<void> {
   await page.getByLabel("견적 검색", { exact: true }).fill("김민수");
   assert.equal(await sampleLink().count(), 1);
   assert.match(await sampleLink().innerText(), /일부 매입/);
+  await historyAmount(sampleLink(), "60,000원", "210,000원", "실제 매입금액");
   await sampleLink().click();
   dialog = await openResult();
   assert.equal(await dialog.getByTestId("purchase-quantity-0").inputValue(), "1", "Reopening must read the saved partial quantities");
@@ -92,6 +102,20 @@ export async function purchaseOutcomeBrowserFlow(page: Page): Promise<void> {
   assert.match(await resultPanel().innerText(), /200,000원/);
   assert.match(await resultPanel().innerText(), /3대/);
   assert.equal(await quoteTable().innerText(), originalQuote);
+
+  await backToHistory();
+  await page.getByLabel("매입 상태 필터", { exact: true }).selectOption("completed");
+  await historyAmount(sampleLink(), "200,000원", "210,000원", "최종 매입금액");
+  for (const viewport of [{ width: 1280, height: 720 }, { width: 1366, height: 768 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await noHorizontalOverflow(`completed purchase history ${viewport.width}`);
+    const amountFits = await sampleLink().getByTestId("history-amount").evaluate(element => element.scrollWidth <= element.clientWidth + 1);
+    assert.equal(amountFits, true, `The actual and quoted list amounts must fit their column at ${viewport.width}px`);
+  }
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await page.screenshot({ path: "outputs/next-migration/purchase-history-amount-laptop.png", fullPage: false });
+  await sampleLink().click();
 
   await page.getByRole("button", { name: "견적 수정", exact: true }).click();
   await page.getByRole("button", { name: "독야1 32칸 항목 수정", exact: true }).click();
@@ -130,6 +154,7 @@ export async function purchaseOutcomeBrowserFlow(page: Page): Promise<void> {
   assert.equal(await sampleLink().count(), 0);
   await page.getByLabel("매입 상태 필터", { exact: true }).selectOption("not_completed");
   assert.equal(await sampleLink().count(), 1);
+  await historyAmount(sampleLink(), "140,000원");
 
   await navigate("새 견적 만들기");
   await page.getByLabel("고객명 (선택)", { exact: true }).fill("매입 결과 검증 고객");
@@ -186,7 +211,18 @@ export async function purchaseOutcomeBrowserFlow(page: Page): Promise<void> {
   await page.getByLabel("견적 검색", { exact: true }).fill("매입 결과 검증 고객");
   const mixedLink = page.locator("main").getByRole("link").filter({ hasText: "매입 결과 검증 고객 매입 견적" });
   assert.equal(await mixedLink.count(), 1);
+  await historyAmount(mixedLink, "160,001원", "350,000원", "실제 매입금액");
   await mixedLink.click();
   assert.match(await resultPanel().innerText(), /160,001원/);
   assert.equal(await quoteTable().innerText(), mixedOriginal);
+
+  dialog = await openResult();
+  await dialog.getByLabel("매입 진행 상태", { exact: true }).selectOption("completed");
+  await dialog.getByLabel("실제 매입금액 (원)", { exact: true }).fill("0");
+  await saveResult();
+  assert.equal(await quoteTable().innerText(), mixedOriginal, "An explicitly recorded zero must not alter the quoted prices");
+  await backToHistory();
+  await page.getByLabel("매입 상태 필터", { exact: true }).selectOption("completed");
+  await page.getByLabel("견적 검색", { exact: true }).fill("매입 결과 검증 고객");
+  await historyAmount(mixedLink, "0원", "350,000원", "최종 매입금액");
 }
