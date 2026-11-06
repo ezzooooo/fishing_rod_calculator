@@ -323,11 +323,12 @@ function Receipt({ record }: { record: QuoteRecord }) {
   </section>;
 }
 
-function HistoryAmount({ record }: { record: QuoteRecord }) {
+function HistoryAmounts({ record }: { record: QuoteRecord }) {
   const outcome = record.mode === "purchase" ? purchaseOutcomeFor(record) : null;
   const actualAmount = outcome && (outcome.status === "completed" || outcome.status === "partial") ? outcome.actualAmount : null;
-  return <div className={styles.historyAmount} data-testid="history-amount">
-    {actualAmount !== null ? <><span className={styles.historyAmountLabel}>{outcome?.status === "completed" ? "최종 매입금액" : "실제 매입금액"}</span><strong>{formatMoney(actualAmount)}</strong><small>견적 {formatMoney(record.totalPrice)}</small></> : <strong>{formatMoney(record.totalPrice)}</strong>}
+  return <div className={styles.historyAmounts}>
+    <div className={styles.historyMoney} data-label="견적금액"><strong data-testid="history-quoted-amount">{formatMoney(record.totalPrice)}</strong></div>
+    <div className={`${styles.historyMoney} ${styles.historyActualAmount}`} data-label="최종 매입금액"><strong data-testid="history-actual-amount">{actualAmount === null ? "—" : formatMoney(actualAmount)}</strong></div>
   </div>;
 }
 
@@ -349,13 +350,13 @@ export function QuoteHistory() {
     })].join(" ")).includes(query);
   });
   return <><PageHeading title="견적 내역" description="견적과 실제 매입 결과를 함께 확인하고, 진행 상태별로 찾아보세요." action={<Link className={styles.primaryLink} href="/"><Plus size={17} />새 견적 만들기</Link>} /><div className={`${styles.card} ${styles.historySearchCard}`}><div className={styles.historyFilters}><div className={styles.historySearch}><Search size={19} /><Input aria-label="견적 검색" placeholder="고객명, 제품명, 구성품 또는 브랜드명 검색" value={search} onChange={event => setSearch(event.target.value)} /></div><select className="control" aria-label="매입 상태 필터" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="all">매입 상태 전체</option>{(["unconfirmed", "in_progress", "completed", "partial", "not_completed"] as const).map(value => <option key={value} value={value}>{purchaseStatusLabel(value)}</option>)}</select></div></div>{!state.ready ? <div className={styles.loading}>견적 내역을 불러오는 중입니다…</div> : state.error ? <div className={styles.card}><EmptyState title="견적 내역을 불러오지 못했습니다" description={state.error} action={<Button variant="secondary" onClick={() => { setState({ records: [], ready: false, error: "" }); setAttempt(value => value + 1); }}>다시 시도</Button>} /></div> : !records.length ? <div className={styles.card}><EmptyState title="저장된 견적이 없습니다" description="새 견적 만들기에서 낚시대와 용품을 담은 뒤 저장해주세요." action={<Link className={styles.primaryLink} href="/">새 견적 만들기</Link>} /></div> : !filtered.length ? <div className={styles.card}><EmptyState title="검색 결과가 없습니다" description="검색어나 매입 상태 필터를 바꿔보세요." /></div> : <><div className={styles.historyCount}>총 {filtered.length}건 · 최근 기록순</div><div className={styles.historyTable}>
-      <div className={styles.historyTableHead} aria-hidden="true"><span>매입 상태</span><span>견적 / 고객</span><span className={styles.historyRodsColumn}>품목</span><span>수량</span><span>견적 / 매입금액</span><span>기록 시간</span><span /></div>
+      <div className={styles.historyTableHead} aria-hidden="true"><span>매입 상태</span><span>견적 / 고객</span><span className={styles.historyRodsColumn}>품목</span><span>수량</span><span className={styles.historyMoneyHeading}>견적금액</span><span className={styles.historyMoneyHeading}>최종 매입금액</span><span>기록 시간</span><span /></div>
       {filtered.map(record => <Link key={record.id} href={`/quotes/detail?id=${encodeURIComponent(record.id)}`} className={styles.historyRow}>
         <div className={styles.historyStatus}>{record.mode === "purchase" ? <PurchaseStatusBadge record={record}/> : <span className={`${styles.badge} ${styles.saleBadge}`}>판매</span>}</div>
-        <div className={styles.historyIdentity}><h2>{record.title}</h2><p>{record.customerName ? `고객 ${record.customerName}` : "고객명 미입력"}</p></div>
-        <p className={styles.historyRodsColumn}>{[...new Set(record.items.map(rodLabel))].join(", ")}</p>
+        <div className={styles.historyIdentity}><h2 title={record.title}>{record.title}</h2><p title={record.customerName}>{record.customerName ? `고객 ${record.customerName}` : "고객명 미입력"}</p></div>
+        <p className={styles.historyRodsColumn} title={[...new Set(record.items.map(rodLabel))].join(", ")}>{[...new Set(record.items.map(rodLabel))].join(", ")}</p>
         <span className={styles.historyQuantity}>{groupQuoteItems(record.items).length}종 · {quoteQuantityLabel(record.items)}</span>
-        <HistoryAmount record={record}/>
+        <HistoryAmounts record={record}/>
         <div className={styles.historyDates}><span>{formatDateTime(record.createdAt)}</span>{record.updatedAt && <span>수정 {formatDateTime(record.updatedAt)}</span>}</div>
         <ChevronRight className={styles.historyChevron} size={16} />
       </Link>)}
