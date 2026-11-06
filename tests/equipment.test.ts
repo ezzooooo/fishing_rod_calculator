@@ -41,15 +41,17 @@ describe("equipment configuration and templates", () => {
   it("uses editable presets without persisting them and merges templates without overwriting product prices", () => {
     const preset = createEquipmentPreset("tent");
     validateEquipmentCategory(preset);
-    assert.deepEqual(preset.optionGroups[0].choices.map(choice => choice.label), ["롱플라이", "하프플라이", "미포함"]);
+    assert.deepEqual(preset.optionGroups[0].choices.map(choice => choice.label), ["롱플라이", "하프플라이"]);
+    assert.equal(preset.optionGroups[0].selection, "multiple");
     const existing = [{ ...preset.optionGroups[0], name: "개별 구성", choices: [{ ...preset.optionGroups[0].choices[0], purchasePrice: 12345 }] }];
     const merged = mergeEquipmentOptionGroups(existing, preset.optionGroups);
     assert.equal(merged[0].name, "개별 구성");
     assert.equal(merged[0].choices[0].purchasePrice, 12345);
-    assert.equal(merged[0].choices.length, 3);
+    assert.equal(merged[0].choices.length, 2);
     merged[0].choices[0].purchasePrice = 999;
     assert.equal(existing[0].choices[0].purchasePrice, 12345);
-    assert.equal(preset.optionGroups[0].choices[0].purchasePrice, 0);
+    assert.equal(preset.optionGroups[0].choices[0].purchasePrice, null);
+    assert.equal(preset.optionGroups[0].choices[0].salePrice, null);
     assert.ok(createEquipmentPreset("platform").optionGroups.some(group => group.choices.some(choice => choice.label === "파라솔 클램프")));
     validateEquipmentCategory(createEquipmentPreset("stand"));
   });
@@ -91,6 +93,57 @@ describe("equipment configuration and templates", () => {
     validateEquipmentProduct(product);
     assert.equal(product.purchasePrice, null); assert.equal(product.salePrice, 0);
     assert.throws(() => validateEquipmentProduct({ ...product, salePrice: -1 }));
+  });
+
+  it("stores unknown option amounts separately from zero without accepting invalid values", () => {
+    const category = normalizeEquipmentCategory({
+      id: "draft", name: "초안", unit: "개", optionGroups: [{
+        id: "parts", name: "구성", selection: "multiple", required: false,
+        choices: [
+          { id: "unknown", label: "미정 부품", purchasePrice: null },
+          { id: "blank", label: "빈 금액", purchasePrice: "", salePrice: "  " },
+          { id: "included", label: "포함 부품", purchasePrice: 0, salePrice: "0" },
+          { id: "deduction", label: "누락 감액", purchasePrice: -5000, salePrice: -10000 },
+        ],
+      }],
+    });
+    assert.doesNotThrow(() => validateEquipmentCategory(category));
+    const choices = category.optionGroups[0].choices;
+    assert.deepEqual(choices.map(choice => [choice.purchasePrice, choice.salePrice]), [[null, null], [null, null], [0, 0], [-5000, -10000]]);
+    const invalid = normalizeEquipmentCategory({ ...category, optionGroups: [{ ...category.optionGroups[0], choices: [{ ...choices[0], purchasePrice: "미정" }] }] });
+    assert.ok(Number.isNaN(invalid.optionGroups[0].choices[0].purchasePrice));
+    assert.throws(() => validateEquipmentCategory(invalid), /가격/);
+    assert.throws(() => validateEquipmentOptionGroups([{ ...category.optionGroups[0], choices: [{ ...choices[0], salePrice: Infinity }] }]), /가격/);
+  });
+
+  it("requires only selected option prices in the active quote mode and preserves real zero", () => {
+    const template: EquipmentOptionGroup[] = [{
+      id: "parts", name: "구성", selection: "quantity", required: false,
+      choices: [
+        { id: "unknown", label: "미정 부품", purchasePrice: null, salePrice: null },
+        { id: "sale-only", label: "판매가 부품", purchasePrice: null, salePrice: 5000 },
+        { id: "included", label: "기본 포함 부품", purchasePrice: 0, salePrice: 0 },
+      ],
+    }];
+    assert.deepEqual(equipmentOptionSnapshots(template, [], "purchase"), []);
+    assert.deepEqual(equipmentOptionSnapshots(template, [{ groupId: "parts", choiceId: "unknown", quantity: 0 }], "purchase"), []);
+    assert.throws(() => equipmentOptionSnapshots(template, [{ groupId: "parts", choiceId: "unknown", quantity: 1 }], "purchase"), /미정 부품 매입 증감금액/);
+    assert.throws(() => equipmentOptionSnapshots(template, [{ groupId: "parts", choiceId: "unknown", quantity: 1 }], "sale"), /미정 부품 판매 증감금액/);
+    assert.throws(() => equipmentOptionSnapshots(template, [{ groupId: "parts", choiceId: "sale-only", quantity: 2 }], "purchase"), /매입 증감금액/);
+    assert.equal(equipmentOptionSnapshots(template, [{ groupId: "parts", choiceId: "sale-only", quantity: 2 }], "sale")[0].unitPrice, 5000);
+    assert.equal(equipmentOptionSnapshots(template, [{ groupId: "parts", choiceId: "included", quantity: 3 }], "purchase")[0].unitPrice, 0);
+  });
+
+  it("allows both tent flies after their amounts are entered without repricing catalogue snapshots", () => {
+    const template = createEquipmentPreset("tent");
+    const selected = [{ groupId: "fly", choiceId: "long", quantity: 1 }, { groupId: "fly", choiceId: "half", quantity: 1 }];
+    assert.throws(() => equipmentOptionSnapshots(template.optionGroups, selected, "purchase"), /롱플라이 매입 증감금액/);
+    template.optionGroups[0].choices[0].purchasePrice = 10000;
+    template.optionGroups[0].choices[1].purchasePrice = 0;
+    const snapshots = equipmentOptionSnapshots(template.optionGroups, selected, "purchase");
+    assert.deepEqual(snapshots.map(component => [component.choiceName, component.unitPrice]), [["롱플라이", 10000], ["하프플라이", 0]]);
+    template.optionGroups[0].choices[0].purchasePrice = null;
+    assert.equal(snapshots[0].unitPrice, 10000);
   });
 });
 

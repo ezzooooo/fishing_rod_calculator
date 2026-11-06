@@ -1,13 +1,14 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
-import { Building2, ChevronDown, Download, FileJson, Layers3, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
+import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { Building2, ChevronDown, Download, FileJson, Layers3, Pencil, Plus, RotateCcw, Search, Trash2, Upload } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import { useEquipmentCatalog } from "@/lib/equipment-context";
 import { availableLengths, normalizeBrand, normalizeFishingRod, priceForLength, type Brand, type FishingRod, type PriceMap } from "@/lib/domain";
 import { brandKey, brandSearchText, matchesBrand, planBrandImport } from "@/lib/brands";
 import { brandReviewPending, confirmedBrandRecommendations, userConfirmedBrandRecommendations, userConfirmedBrandReviewItems } from "@/lib/brand-recommendations";
 import { formatDateTime, formatMoney } from "@/lib/format";
+import { generateSteppedRodPrices } from "@/lib/rod-pricing";
 import { Button, EmptyState, Field, Input, Modal, PageHeading, Textarea } from "@/components/ui";
 import styles from "./catalog-workspace.module.css";
 
@@ -112,30 +113,66 @@ function RodEditor({ rod, onClose }: { rod?: FishingRod; onClose: () => void }) 
   const [maximum, setMaximum] = useState(String(rod?.maxValue ?? 60));
   const [customLength, setCustomLength] = useState("");
   const [bulkTarget, setBulkTarget] = useState("both");
+  const [bulkLength, setBulkLength] = useState(() => rod ? String(availableLengths(rod)[0] ?? "") : "");
   const [bulkBase, setBulkBase] = useState("");
   const [bulkStep, setBulkStep] = useState("0");
+  const [resetConfirm, setResetConfirm] = useState(false);
+  const [lengthToolsOpen, setLengthToolsOpen] = useState(!rod);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const lengths = Object.keys(prices).map(Number).sort((a, b) => a - b);
+  const baseLength = lengths.includes(Number(bulkLength)) ? Number(bulkLength) : Number.NaN;
   const changePrice = (length: number, type: "purchase" | "sale", value: string) => setPrices((previous) => ({ ...previous, [length]: { ...previous[length], [type]: value } }));
   function applyRange() {
     const start = Number(minimum), end = Number(maximum);
     if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end > 200 || start > end) { setError("칸수 범위는 1~200 사이에서 최소값부터 최대값 순서로 입력해주세요."); return; }
     const next: PriceInputs = {};
     for (let length = start; length <= end; length += 2) next[length] = prices[length] ?? { purchase: "", sale: "" };
+    if (!next[bulkLength]) { setBulkLength(String(start)); setBulkBase(""); }
     setPrices(next); setError("");
   }
   function addLength() {
     const length = Number(customLength);
     if (!Number.isInteger(length) || length < 1 || length > 200) { setError("추가할 칸수를 1~200 사이의 정수로 입력해주세요."); return; }
+    if (!lengths.length) setBulkLength(String(length));
     setPrices((previous) => ({ ...previous, [length]: previous[length] ?? { purchase: "", sale: "" } })); setCustomLength(""); setError("");
   }
+  function removeLength(length: number) {
+    setPrices(previous => { const next = { ...previous }; delete next[length]; return next; });
+    if (length === baseLength) { setBulkLength(""); setBulkBase(""); }
+    setError("");
+  }
+  function nextPrice(event: KeyboardEvent<HTMLInputElement>, length: number, type: "purchase" | "sale") {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    const form = event.currentTarget.form;
+    const nextLength = type === "purchase" ? length : lengths[lengths.indexOf(length) + 1];
+    if (nextLength !== undefined) {
+      form?.querySelector<HTMLInputElement>(`[data-price-length="${nextLength}"][data-price-type="${type === "purchase" ? "sale" : "purchase"}"]`)?.focus();
+    } else {
+      form?.ownerDocument.querySelector<HTMLButtonElement>('button[form="rod-editor"][type="submit"]')?.focus();
+    }
+  }
+  function resetPrices() {
+    setPrices({}); setMinimum(""); setMaximum(""); setCustomLength("");
+    setBulkLength(""); setBulkBase(""); setBulkStep(""); setBulkTarget("both");
+    setError(""); setResetConfirm(false); setLengthToolsOpen(true);
+  }
   function applyBulk() {
-    const base = Number(bulkBase), step = Number(bulkStep);
-    if (!lengths.length || !bulkBase.trim() || !Number.isFinite(base) || base < 0 || !Number.isFinite(step) || step < 0 || lengths.some((_, index) => !Number.isFinite(base + index * step))) { setError("칸수를 먼저 선택하고 기준 금액과 증가 금액을 0 이상으로 입력해주세요."); return; }
-    const next = { ...prices };
-    lengths.forEach((length, index) => { const value = String(base + index * step); next[length] = { purchase: bulkTarget !== "sale" ? value : prices[length].purchase, sale: bulkTarget !== "purchase" ? value : prices[length].sale }; });
-    setPrices(next); setError("");
+    try {
+      if (!bulkBase.trim() || !bulkStep.trim()) throw new Error("기준 금액과 칸수별 가격 차이를 입력해주세요. 같은 가격으로 설정하려면 가격 차이를 0원으로 입력하세요.");
+      const generated = generateSteppedRodPrices(lengths, baseLength, Number(bulkBase), Number(bulkStep));
+      setPrices(previous => Object.fromEntries(lengths.map(length => [length, {
+        purchase: bulkTarget !== "sale" ? String(generated[length]) : previous[length].purchase,
+        sale: bulkTarget !== "purchase" ? String(generated[length]) : previous[length].sale,
+      }])));
+      setError("");
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "가격 자동 설정 값을 확인해주세요."); }
+  }
+  function changeBulkLength(value: string) {
+    setBulkLength(value);
+    setBulkBase(prices[value]?.[bulkTarget === "sale" ? "sale" : "purchase"] ?? "");
+    setError("");
   }
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -154,13 +191,16 @@ function RodEditor({ rod, onClose }: { rod?: FishingRod; onClose: () => void }) 
     } catch { setError("가격표를 저장하지 못했습니다. 잠시 후 다시 시도해주세요."); }
     finally { setBusy(false); }
   }
-  return <Modal wide title={rod ? "낚시대 수정" : "낚시대 추가"} onClose={busy ? undefined : onClose} footer={<><Button variant="secondary" onClick={onClose} disabled={busy}>취소</Button><Button type="submit" form="rod-editor" disabled={busy || !brands.length}>{busy ? "저장 중…" : "가격표 저장"}</Button></>}>
-    <form id="rod-editor" className={styles.editor} onSubmit={save}>
+  return <Modal wide title={rod ? "낚시대 수정" : "낚시대 추가"} closeOnBackdrop={false} onClose={busy ? undefined : onClose} footer={<><Button variant="secondary" onClick={onClose} disabled={busy}>취소</Button><Button type="submit" form="rod-editor" disabled={busy || !brands.length}>{busy ? "저장 중…" : "가격표 저장"}</Button></>}>
+    <form id="rod-editor" className={styles.editor} onSubmit={save} onKeyDown={event => {
+      if (event.key === "Enter" && !event.nativeEvent.isComposing && event.target instanceof HTMLInputElement) event.preventDefault();
+    }}>
       <div className={styles.twoColumns}><Field label="브랜드"><select required value={brandId} onChange={(event) => setBrandId(event.target.value)} disabled={busy}><option value="">브랜드 선택</option>{rod && !brands.some((brand) => brand.id === rod.brandId) && <option value={rod.brandId}>삭제된 브랜드 ({rod.brandId})</option>}{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</select></Field><Field label="낚시대명"><Input autoFocus required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} disabled={busy} placeholder="낚시대 이름" /></Field></div>
-      <div className={styles.editorTools}><details className={styles.toolDisclosure} open={!rod}><summary><span>칸수 구성 <small>{lengths.length}개 선택</small></span><ChevronDown size={15} /></summary><div className={styles.toolContent}><p className={styles.toolHint}>범위는 2칸 간격으로 추가합니다.</p><div className={styles.rangeRow}><Field label="최소 칸수"><Input type="number" min={1} max={200} step={1} value={minimum} onChange={(event) => setMinimum(event.target.value)} disabled={busy} /></Field><Field label="최대 칸수"><Input type="number" min={1} max={200} step={1} value={maximum} onChange={(event) => setMaximum(event.target.value)} disabled={busy} /></Field><Button variant="secondary" type="button" disabled={busy} onClick={applyRange}>범위 적용</Button></div><div className={styles.customLength}><Input aria-label="개별 칸수" placeholder="개별 칸수" type="number" min={1} max={200} step={1} value={customLength} onChange={(event) => setCustomLength(event.target.value)} disabled={busy} /><Button variant="secondary" type="button" disabled={busy} onClick={addLength}><Plus size={15} />칸수 추가</Button></div></div></details>
-      <details className={styles.toolDisclosure}><summary><span>가격 일괄 입력</span><ChevronDown size={15} /></summary><div className={styles.toolContent}><p className={styles.toolHint}>칸수 순서대로 기준 금액에 증가 금액을 더합니다. 같은 가격은 증가 금액을 0원으로 입력하세요.</p><div className={styles.bulkGrid}><Field label="적용 대상"><select value={bulkTarget} onChange={(event) => setBulkTarget(event.target.value)} disabled={busy}><option value="both">매입가·판매가</option><option value="purchase">매입가</option><option value="sale">판매가</option></select></Field><Field label="기준 금액"><Input type="number" min={0} step="any" value={bulkBase} onChange={(event) => setBulkBase(event.target.value)} placeholder="원" disabled={busy} /></Field><Field label="칸수별 증가 금액"><Input type="number" min={0} step="any" value={bulkStep} onChange={(event) => setBulkStep(event.target.value)} disabled={busy} /></Field></div><Button variant="secondary" type="button" onClick={applyBulk} disabled={busy || !lengths.length}>선택 칸수에 적용</Button></div></details></div>
-      <div className={styles.sectionHeading}><h3>칸수별 가격표</h3><span>매입 · 판매 기준 단가</span></div>
-      {lengths.length ? <div className={`${styles.tableScroll} ${styles.priceTableScroll}`}><table className={`${styles.table} ${styles.priceTable}`}><thead><tr><th>칸수</th><th>매입가 (원)</th><th>판매가 (원)</th><th><span className={styles.srOnly}>칸수 삭제</span></th></tr></thead><tbody>{lengths.map((length) => <tr key={length}><th scope="row">{length}칸</th><td><Input aria-label={`${length}칸 매입가`} type="number" required min={0} step="any" value={prices[length].purchase} onChange={(event) => changePrice(length, "purchase", event.target.value)} disabled={busy} /></td><td><Input aria-label={`${length}칸 판매가`} type="number" required min={0} step="any" value={prices[length].sale} onChange={(event) => changePrice(length, "sale", event.target.value)} disabled={busy} /></td><td><Button variant="ghost" type="button" aria-label={`${length}칸 삭제`} disabled={busy} onClick={() => setPrices((previous) => { const next = { ...previous }; delete next[length]; return next; })}><Trash2 size={15} /></Button></td></tr>)}</tbody></table></div> : <div className={styles.notice}>범위를 적용하거나 칸수를 개별 추가해주세요.</div>}
+      <div className={styles.editorTools}><details className={styles.toolDisclosure} open={lengthToolsOpen} onToggle={event => setLengthToolsOpen(event.currentTarget.open)}><summary><span>칸수 구성 <small>{lengths.length}개 선택</small></span><ChevronDown size={15} /></summary><div className={styles.toolContent}><p className={styles.toolHint}>범위는 2칸 간격으로 추가합니다.</p><div className={styles.rangeRow}><Field label="최소 칸수"><Input type="number" min={1} max={200} step={1} value={minimum} onChange={(event) => setMinimum(event.target.value)} disabled={busy} /></Field><Field label="최대 칸수"><Input type="number" min={1} max={200} step={1} value={maximum} onChange={(event) => setMaximum(event.target.value)} disabled={busy} /></Field><Button variant="secondary" type="button" disabled={busy} onClick={applyRange}>범위 적용</Button></div><div className={styles.customLength}><Input aria-label="개별 칸수" placeholder="개별 칸수" type="number" min={1} max={200} step={1} value={customLength} onChange={(event) => setCustomLength(event.target.value)} disabled={busy} /><Button variant="secondary" type="button" disabled={busy} onClick={addLength}><Plus size={15} />칸수 추가</Button></div></div></details>
+      <details className={styles.toolDisclosure} open={!rod}><summary><span><span>가격 일괄 입력</span> <small>기준 칸수로 자동 설정</small></span><ChevronDown size={15} /></summary><div className={styles.toolContent}><p className={styles.toolHint}>기준 칸수보다 긴 칸수는 더하고, 짧은 칸수는 뺍니다. 선택한 칸수의 순서마다 가격 차이를 적용하며, 0원 미만은 0원으로 설정합니다.</p><div className={styles.bulkGrid}><Field label="적용 대상"><select value={bulkTarget} onChange={(event) => setBulkTarget(event.target.value)} disabled={busy}><option value="both">매입가·판매가</option><option value="purchase">매입가</option><option value="sale">판매가</option></select></Field><Field label="기준 칸수"><select value={Number.isFinite(baseLength) ? String(baseLength) : ""} onChange={event => changeBulkLength(event.target.value)} disabled={busy || !lengths.length}>{!Number.isFinite(baseLength) && <option value="">{lengths.length ? "기준 칸수를 선택하세요" : "칸수를 먼저 추가하세요"}</option>}{lengths.map(length => <option key={length} value={length}>{length}칸</option>)}</select></Field><Field label="기준 금액"><Input type="number" min={0} step="any" value={bulkBase} onChange={(event) => setBulkBase(event.target.value)} placeholder="원" disabled={busy} /></Field><Field label="칸수별 가격 차이"><Input type="number" min={0} step="any" value={bulkStep} onChange={(event) => setBulkStep(event.target.value)} disabled={busy} /></Field></div><Button variant="secondary" type="button" onClick={applyBulk} disabled={busy || !lengths.length}>선택 칸수에 적용</Button></div></details></div>
+      <div className={styles.priceHeading}><div><h3>칸수별 가격표</h3><span>가격 입력 후 Enter: 다음 가격 · 마지막 입력 후 저장 버튼으로 이동</span></div><Button variant="ghost" disabled={busy} onClick={() => setResetConfirm(true)}><RotateCcw size={14} />칸수·가격 초기화</Button></div>
+      {resetConfirm && <div className={styles.resetPrices} role="group" aria-label="칸수·가격 초기화 확인"><p>선택한 칸수와 가격을 모두 비울까요? 브랜드와 낚시대명은 유지합니다.</p><div><Button variant="secondary" disabled={busy} onClick={() => setResetConfirm(false)}>초기화 취소</Button><Button variant="danger" disabled={busy} onClick={resetPrices}>모두 초기화</Button></div></div>}
+      {lengths.length ? <div className={`${styles.tableScroll} ${styles.priceTableScroll}`}><table className={`${styles.table} ${styles.priceTable}`}><thead><tr><th>칸수</th><th>매입가 (원)</th><th>판매가 (원)</th><th><span className={styles.srOnly}>칸수 삭제</span></th></tr></thead><tbody>{lengths.map((length) => <tr key={length}><th scope="row">{length}칸</th><td><Input aria-label={`${length}칸 매입가`} data-price-length={length} data-price-type="purchase" type="number" required min={0} step="any" value={prices[length].purchase} onKeyDown={event => nextPrice(event, length, "purchase")} onChange={(event) => changePrice(length, "purchase", event.target.value)} disabled={busy} /></td><td><Input aria-label={`${length}칸 판매가`} data-price-length={length} data-price-type="sale" type="number" required min={0} step="any" value={prices[length].sale} onKeyDown={event => nextPrice(event, length, "sale")} onChange={(event) => changePrice(length, "sale", event.target.value)} disabled={busy} /></td><td><Button variant="ghost" type="button" aria-label={`${length}칸 삭제`} disabled={busy} onClick={() => removeLength(length)}><Trash2 size={15} /></Button></td></tr>)}</tbody></table></div> : <div className={styles.notice}>범위를 적용하거나 칸수를 개별 추가해주세요.</div>}
       {error && <p className={styles.error} role="alert">{error}</p>}
     </form>
   </Modal>;

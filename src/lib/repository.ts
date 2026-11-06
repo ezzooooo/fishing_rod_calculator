@@ -2,6 +2,7 @@ import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query
 import { normalizeBrand, normalizeFishingRod, normalizeQuoteRecord, quoteTotals, validateQuote, type Brand, type FishingRod, type QuoteRecord } from './domain';
 import { cloneEquipmentItem, normalizeEquipmentCategory, normalizeEquipmentProduct, validateEquipmentCategory, validateEquipmentProduct, type EquipmentCategory, type EquipmentProduct } from './equipment';
 import { activeBrands, assertBrandAvailable, assertBrandDeletable, brandDocumentId, mergedBrandIdsFor, normalizeBrandAliases, planBrandImport, resolveBrandId, validateBrandInput, type BrandImportResult, type BrandInput } from './brands';
+import { planEquipmentCategoryImport, type EquipmentCategoryImportAliases, type EquipmentCategoryImportResult } from './equipment-category-import';
 
 export type QuoteInput = Pick<QuoteRecord, 'title' | 'note' | 'customerName' | 'mode' | 'items'>;
 type Receive<T> = (value: T) => void;
@@ -12,6 +13,7 @@ export interface AppRepository {
   watchEquipmentCategories(receive: Receive<EquipmentCategory[]>, fail: Fail): () => void;
   watchEquipmentProducts(receive: Receive<EquipmentProduct[]>, fail: Fail): () => void;
   saveEquipmentCategory(value: EquipmentCategory): Promise<void>;
+  importEquipmentCategories(drafts: readonly EquipmentCategory[], aliases?: EquipmentCategoryImportAliases): Promise<EquipmentCategoryImportResult>;
   deleteEquipmentCategory(id: string): Promise<void>;
   saveEquipmentProduct(value: EquipmentProduct): Promise<void>;
   deleteEquipmentProduct(id: string): Promise<void>;
@@ -52,6 +54,16 @@ function quoteData(input: QuoteInput) {
   validateQuote(input);
   const totals = quoteTotals(input.items);
   return { title: input.title.trim(), note: input.note.trim(), customerName: input.customerName.trim(), mode: input.mode, items: input.items.map(item => item.kind === 'equipment' ? cloneEquipmentItem(item) : ({ ...item })), totalQuantity: totals.totalQuantity, totalPrice: totals.totalPrice };
+}
+function categoryImportData(raw: Record<string, unknown>, id: string): EquipmentCategory {
+  const category = normalizeEquipmentCategory(raw, id);
+  const groups = Array.isArray(raw.optionGroups) ? raw.optionGroups : [];
+  // Keep unrecognized metadata too; this import only appends missing template data.
+  return { ...raw, ...category, optionGroups: category.optionGroups.map((group, index) => {
+    const stored = groups[index] as Record<string, unknown>;
+    const choices = Array.isArray(stored?.choices) ? stored.choices : [];
+    return { ...stored, ...group, choices: group.choices.map((choice, choiceIndex) => ({ ...choices[choiceIndex], ...choice })) };
+  }) };
 }
 export class FirebaseRepository implements AppRepository {
   constructor(private readonly database: Firestore, private readonly session: () => { uid: string | null; authorized: boolean }) {}
@@ -98,6 +110,28 @@ export class FirebaseRepository implements AppRepository {
     this.authorize(); validateEquipmentCategory(value);
     const category = normalizeEquipmentCategory(value as unknown as Record<string,unknown>, documentId(value.id));
     await setDoc(doc(this.database, 'equipment_categories', category.id), { ...category, createdAt:value.createdAt??new Date().toISOString(), updatedAt:new Date().toISOString() });
+  }
+  async importEquipmentCategories(drafts: readonly EquipmentCategory[], aliases: EquipmentCategoryImportAliases = {}): Promise<EquipmentCategoryImportResult> {
+    this.authorize();
+    const initial = planEquipmentCategoryImport([], drafts, aliases);
+    if (initial.conflicts) throw new Error(`분류 초안이 겹치는 항목 ${initial.conflicts}개가 있습니다. 미리보기를 다시 확인해주세요.`);
+    const inventory = await getDocs(collection(this.database, 'equipment_categories'));
+    const ids = [...new Set([...inventory.docs.map(value => value.id), ...drafts.map(value => value.id)])];
+    if (ids.length > 400) throw new Error('분류가 400개를 초과해 한 번에 등록할 수 없습니다.');
+    return runTransaction(this.database, async transaction => {
+      this.authorize();
+      const latest = await Promise.all(ids.map(id => transaction.get(doc(this.database, 'equipment_categories', documentId(id)))));
+      const existing = latest.filter(value => value.exists()).map(value => categoryImportData(value.data()!, value.id));
+      const plan = planEquipmentCategoryImport(existing, drafts, aliases);
+      if (plan.conflicts) throw new Error(`기존 분류와 안전하게 연결할 수 없는 항목 ${plan.conflicts}개가 있습니다. 미리보기를 다시 확인해주세요.`);
+      const now = new Date().toISOString();
+      for (const entry of plan.entries) {
+        const reference = doc(this.database, 'equipment_categories', entry.category.id);
+        if (entry.action === 'create') transaction.set(reference, { ...entry.category, createdAt: now, updatedAt: now });
+        if (entry.action === 'update') transaction.update(reference, { optionGroups: entry.category.optionGroups, updatedAt: now });
+      }
+      return { created: plan.created, updated: plan.updated, unchanged: plan.unchanged };
+    });
   }
   async deleteEquipmentCategory(id: string) { this.authorize(); await deleteDoc(doc(this.database,'equipment_categories',documentId(id))); }
   async saveEquipmentProduct(value: EquipmentProduct) {

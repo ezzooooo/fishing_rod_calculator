@@ -28,11 +28,11 @@ export function Field({label,hint,children}:{label:string;hint?:string;children:
   }
   return <div className="field"><label id={labelId} htmlFor={controlId} className="field-label">{label}</label><FieldContext.Provider value={{id:controlId,labelId}}>{content}</FieldContext.Provider>{hint&&<span className="field-hint">{hint}</span>}</div>;
 }
-export function Modal({title,onClose,children,footer,wide=false}:{title:string;onClose?:()=>void;children:ReactNode;footer?:ReactNode;wide?:boolean}) {
+export function Modal({title,onClose,children,footer,wide=false,closeOnBackdrop=true}:{title:string;onClose?:()=>void;children:ReactNode;footer?:ReactNode;wide?:boolean;closeOnBackdrop?:boolean}) {
   const reference=useRef<HTMLDialogElement>(null);
   const titleId=useId();
   useEffect(()=>{const dialog=reference.current;dialog?.showModal();return()=>dialog?.close();},[]);
-  return <dialog ref={reference} className={`modal ${wide?'modal-wide':''}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();onClose?.();}} onClick={event=>{if(event.target===event.currentTarget)onClose?.();}}>
+  return <dialog ref={reference} className={`modal ${wide?'modal-wide':''}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();onClose?.();}} onClick={event=>{if(closeOnBackdrop&&event.target===event.currentTarget)onClose?.();}}>
     <div className="modal-frame"><header className="modal-header"><h2 id={titleId}>{title}</h2><Button variant="ghost" aria-label="닫기" disabled={!onClose} onClick={onClose}><X size={20}/></Button></header><div className="modal-body">{children}</div>{footer&&<footer className="modal-footer">{footer}</footer>}</div>
   </dialog>;
 }

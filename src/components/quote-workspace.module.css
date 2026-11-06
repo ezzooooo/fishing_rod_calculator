@@ -17,6 +17,7 @@
 .modeToggle button{display:flex;align-items:center;justify-content:center;gap:5px;min-width:70px;padding:3px 11px;border:0;border-radius:5px;color:var(--muted,#687872);background:transparent;font:inherit;font-size:12px;cursor:pointer}
 .modeToggle .modeSelected{color:#136f59;background:#fff;box-shadow:0 1px 4px #1c523315;font-weight:750}
 .basketSection{display:grid;min-width:0;gap:10px}
+.undoNotice{display:flex;align-items:center;gap:8px;min-width:0;padding:8px 10px;border:1px solid #dbe7de;border-radius:9px;background:#f0f7f1;color:#42624f;font-size:12px;line-height:1.5}.undoNotice>span{flex:1;min-width:0;overflow-wrap:anywhere}.undoNotice>button{flex-shrink:0;min-height:32px;padding:6px 8px;font-size:11px}
 .sectionHeading{display:flex;flex-wrap:wrap;align-items:center;gap:9px;min-height:36px;margin-bottom:12px}
 .basketSection>.sectionHeading{margin:0 0 1px}
 .sectionHeading h2{margin:0;color:#20382d;font-size:15px;font-weight:740;letter-spacing:-.3px}

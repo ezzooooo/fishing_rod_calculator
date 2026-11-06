@@ -81,11 +81,19 @@
 .customLength { display:flex; align-items:center; gap:7px; margin-top:9px; }
 .customLength input { width:0; min-width:0; flex:1; }
 .customLength button,.rangeRow button { white-space:nowrap; }
-.bulkGrid { display:grid; grid-template-columns:1.15fr 1fr 1fr; gap:7px; margin-bottom:10px; }
+.bulkGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin-bottom:10px; }
 .bulkGrid select { width:100%; border:1px solid var(--line,#e1e8e1); border-radius:7px; background:#fff; color:#4a6757; }
 .sectionHeading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .sectionHeading h3 { margin:0; color:#2e4b3c; font-size:13px; font-weight:650; }
 .sectionHeading > span { color:var(--muted,#687872); font-size:11px; }
+.priceHeading { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.priceHeading h3 { margin:0; color:#2e4b3c; font-size:13px; font-weight:650; }
+.priceHeading span { display:block; margin-top:3px; color:var(--muted,#687872); font-size:10px; }
+.priceHeading button { flex:none; min-height:32px; padding:6px 8px; font-size:11px; }
+.resetPrices { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:11px 12px; border:1px solid #edd1d2; border-radius:9px; background:#fff8f8; }
+.resetPrices p { margin:0; color:#7e4c50; font-size:11px; line-height:1.6; }
+.resetPrices > div { display:flex; flex:none; gap:7px; }
+.resetPrices button { min-height:32px; padding:6px 9px; font-size:11px; }
 .priceTableScroll { max-height:min(39dvh,320px); border:1px solid var(--line,#e1e8e1); border-radius:9px; overscroll-behavior:contain; }
 .priceTable { min-width:450px; }
 .priceTable thead { position:sticky; top:0; z-index:2; background:#f5f8f2; }
@@ -121,6 +129,7 @@
   .rodBrand,.rodName,.rodLengths { grid-column:1/-1; }.rodBrand { padding-right:96px!important; }.brandLabel { max-width:100%; padding:2px 6px; font-size:10px; }.rodName { padding-right:90px!important; }.rodName button { max-width:100%; font-size:14px; white-space:normal; overflow-wrap:anywhere; }.rodLengths { display:flex!important; align-items:center; color:#6b826f; font-size:11px; }.rodLengths small { margin-left:9px; font-size:10px; }.rodPrice { display:grid!important; gap:3px; text-align:left; margin-top:2px; color:#46684f; font-size:11px; overflow-wrap:anywhere; }.rodPrice:before { content:attr(data-label); color:var(--muted,#687872); font-size:11px; }.rodActions { position:absolute; top:10px; right:8px; width:auto!important; }
   .editor { gap:14px; }.twoColumns { grid-template-columns:1fr; gap:12px; }.editorTools { grid-template-columns:1fr; gap:8px; }.toolDisclosure summary { min-height:44px; padding:12px; }.rangeRow { grid-template-columns:1fr 1fr; gap:8px; }.rangeRow button { grid-column:1/-1; }.customLength { gap:8px; }.rangeRow input,.customLength input,.bulkGrid input,.bulkGrid select { min-height:44px; font-size:16px; }.rangeRow button,.customLength button,.toolContent > button { min-height:44px; font-size:12px; }.bulkGrid { grid-template-columns:1fr; }.toolHint { font-size:11px; }.rangeRow :global(.field-label),.bulkGrid :global(.field-label) { font-size:11px; }
   .priceTable { min-width:430px; }.priceTableScroll { max-height:280px; }.priceTable input { min-height:44px; font-size:16px; }.priceTable tbody th,.priceTable tbody td { height:58px; padding:7px 9px; }.priceTable td:last-child button { min-height:44px; padding:8px; }
+  .priceHeading { align-items:flex-start; flex-wrap:wrap; gap:7px; }.priceHeading button { min-height:44px; }.priceHeading span { font-size:10px; }.resetPrices { align-items:flex-start; flex-direction:column; gap:9px; }.resetPrices button { min-height:44px; }
   .settingsGrid { grid-template-columns:1fr; gap:12px; }.settingsCard { padding:17px 15px; }.settingsActions { gap:8px; }.settingsActions button { min-height:44px; padding:8px; font-size:11px; }.settingsActions button:last-child { min-height:40px; }.importHelp { padding:13px 14px; gap:9px; }.importHelp p { font-size:11px; }
 }
 @media(prefers-reduced-motion:reduce) { .toolDisclosure summary > svg { transition:none; } }

@@ -26,6 +26,12 @@ const modePriceLabel = (mode: CalculationMode) => `${modeLabel(mode)} 단가`;
 const optionalNumber = (value: string): number | null => value.trim() === "" ? null : Number(value);
 const componentKey = (component: Pick<ComponentLine, "groupId" | "choiceId">) => JSON.stringify([component.groupId, component.choiceId]);
 const componentLines = (item?: EquipmentQuoteItem): ComponentLine[] => item?.components.map(component => ({ ...component, quantity: String(component.quantity), unitPrice: String(component.unitPrice) })) ?? [];
+const optionPriceLabel = (price: number | null) => price === null ? "금액 미정" : formatMoney(price);
+const componentAmount = (component: ComponentLine): number | null => {
+  const price = optionalNumber(component.unitPrice), quantity = component.quantity.trim() === "" ? Number.NaN : Number(component.quantity);
+  const total = price === null ? Number.NaN : price * quantity;
+  return price === null || !Number.isFinite(price) || !Number.isSafeInteger(quantity) || quantity <= 0 || !Number.isFinite(total) ? null : total;
+};
 
 /** Quote-local editing always starts with saved names and prices, not the live catalogue. */
 export function EquipmentPicker({ mode, initial, onClose, onApply }: Props) {
@@ -112,7 +118,7 @@ export function EquipmentPicker({ mode, initial, onClose, onApply }: Props) {
       const previous = current.find(component => component.groupId === group.id && component.choiceId === choiceId);
       return [...retained, previous ? { ...previous, quantity: count } : {
         groupId: group.id, groupName: group.name, choiceId: choice.id, choiceName: choice.label,
-        quantity: count, unitPrice: String(equipmentPriceForMode(choice, mode) ?? 0),
+        quantity: count, unitPrice: equipmentPriceForMode(choice, mode) === null ? "" : String(equipmentPriceForMode(choice, mode)),
       }];
     });
     setError("");
@@ -122,9 +128,11 @@ export function EquipmentPicker({ mode, initial, onClose, onApply }: Props) {
     setError("");
   }
   function addComponent() {
-    setComponents(current => [...current, { groupId: customGroup, groupName: "추가 구성", choiceId: crypto.randomUUID(), choiceName: "", quantity: "1", unitPrice: "0" }]);
+    setComponents(current => [...current, { groupId: customGroup, groupName: "추가 구성", choiceId: crypto.randomUUID(), choiceName: "", quantity: "1", unitPrice: "" }]);
   }
   function toItem(): EquipmentQuoteItem {
+    const missingPrice = components.find(component => component.unitPrice.trim() === "");
+    if (missingPrice) throw new Error(`${missingPrice.choiceName.trim() || "추가 구성품"}의 추가 단가를 입력해주세요. 추가금이 없으면 0원을 입력하세요.`);
     const savedRate = initial?.rate != null && rate === String(initial.rate * 100) ? initial.rate : Number(rate) / 100;
     const item = calculateEquipmentQuoteItem({
       kind: "equipment", id: lineId, categoryId, categoryName: categoryName.trim(), productId,
@@ -142,7 +150,9 @@ export function EquipmentPicker({ mode, initial, onClose, onApply }: Props) {
   }
   let calculated: EquipmentQuoteItem | null = null;
   try { calculated = toItem(); } catch { /* Incomplete fields are explained on submit. */ }
-  const componentTotal = components.reduce((sum, component) => sum + (Number(component.unitPrice) || 0) * (Number(component.quantity) || 0), 0);
+  const componentAmounts = components.map(componentAmount);
+  const componentSum = componentAmounts.reduce<number>((sum, amount) => sum + (amount ?? 0), 0);
+  const componentTotal = componentAmounts.some(amount => amount === null) || !Number.isFinite(componentSum) ? null : componentSum;
   function submit(event: FormEvent) {
     event.preventDefault(); setError("");
     try {
@@ -158,7 +168,7 @@ export function EquipmentPicker({ mode, initial, onClose, onApply }: Props) {
     } catch (failure) { setError(failure instanceof Error ? failure.message : "품목 정보를 확인해주세요."); }
   }
   const disabledProductNote = loading ? "등록 제품을 불러오는 중입니다. 직접 입력도 가능합니다." : products.length ? "제품을 바꾸면 수량과 선택 구성이 초기화됩니다." : "등록된 제품이 없어도 직접 입력해 견적에 담을 수 있습니다.";
-  return <Modal wide title={initial ? "용품 항목 수정" : "용품 추가"} onClose={onClose} footer={<div className={styles.footer}>
+  return <Modal wide closeOnBackdrop={false} title={initial ? "용품 항목 수정" : "용품 추가"} onClose={onClose} footer={<div className={styles.footer}>
     <div><span>{quantity || "0"}{unit || "개"} · {modeLabel(mode)} 견적</span><strong>{calculated ? formatMoney(calculated.finalUnitPrice * calculated.quantity) : "금액 입력 필요"}</strong></div>
     <Button form="equipment-quote" type="submit">{initial ? <Check size={16} /> : <PackagePlus size={16} />}{initial ? "변경 반영" : "견적에 담기"}</Button>
   </div>}>
@@ -186,20 +196,22 @@ export function EquipmentPicker({ mode, initial, onClose, onApply }: Props) {
         </div>
       </section>
       {!!groups.length && <section className={styles.optionsSection} aria-label="제품 구성 선택"><div className={styles.sectionHeading}><h3>추가 구성 선택</h3><span>본체 1{unit || "개"}당 구성</span></div>
+        {groups.some(group => group.choices.some(choice => equipmentPriceForMode(choice, mode) === null)) && <p className={styles.hint}>금액 미정인 구성을 선택하면 아래 담은 구성품에서 이번 견적의 추가 단가를 입력해주세요.</p>}
         <div className={styles.groups}>{groups.map(group => <div className={styles.optionGroup} key={group.id}>
           <div className={styles.groupTitle}><strong>{group.name}</strong><span>{group.required ? "필수" : "선택"} · {group.selection === "single" ? "하나 선택" : group.selection === "multiple" ? "여러 개 선택" : "수량 입력"}</span></div>
-          {group.selection === "single" ? <select className="control" aria-label={`${group.name} 구성 선택`} value={components.find(component => component.groupId === group.id)?.choiceId ?? ""} onChange={event => selectChoice(group, event.target.value, "1")}><option value="">선택하지 않음</option>{group.choices.map(choice => <option value={choice.id} key={choice.id}>{choice.label} · {formatMoney(equipmentPriceForMode(choice, mode) ?? 0)}</option>)}</select> : <div className={styles.choices}>{group.choices.map(choice => group.selection === "multiple" ? <label className={styles.checkChoice} key={choice.id}><input type="checkbox" checked={Number(componentQuantity(group.id, choice.id)) > 0} onChange={event => selectChoice(group, choice.id, event.target.checked ? "1" : "0")} /><span>{choice.label}</span><small>{formatMoney(equipmentPriceForMode(choice, mode) ?? 0)}</small></label> : <div className={styles.quantityChoice} key={choice.id}><span>{choice.label}<small>{formatMoney(equipmentPriceForMode(choice, mode) ?? 0)}</small></span><Input aria-label={`${group.name} ${choice.label} 수량`} type="number" min={0} step={1} value={componentQuantity(group.id, choice.id)} onChange={event => selectChoice(group, choice.id, event.target.value)} /></div>)}</div>}
+          {group.selection === "single" ? <select className="control" aria-label={`${group.name} 구성 선택`} value={components.find(component => component.groupId === group.id)?.choiceId ?? ""} onChange={event => selectChoice(group, event.target.value, "1")}><option value="">선택하지 않음</option>{group.choices.map(choice => <option value={choice.id} key={choice.id}>{choice.label} · {optionPriceLabel(equipmentPriceForMode(choice, mode))}</option>)}</select> : <div className={styles.choices}>{group.choices.map(choice => group.selection === "multiple" ? <label className={styles.checkChoice} key={choice.id}><input type="checkbox" checked={Number(componentQuantity(group.id, choice.id)) > 0} onChange={event => selectChoice(group, choice.id, event.target.checked ? "1" : "0")} /><span>{choice.label}</span><small>{optionPriceLabel(equipmentPriceForMode(choice, mode))}</small></label> : <div className={styles.quantityChoice} key={choice.id}><span>{choice.label}<small>{optionPriceLabel(equipmentPriceForMode(choice, mode))}</small></span><Input aria-label={`${group.name} ${choice.label} 수량`} type="number" min={0} step={1} value={componentQuantity(group.id, choice.id)} onChange={event => selectChoice(group, choice.id, event.target.value)} /></div>)}</div>}
         </div>)}</div>
       </section>}
       <section className={styles.componentsSection} aria-label="담은 구성품"><div className={styles.sectionHeading}><h3>담은 구성품 <span>{components.length}개</span></h3><Button variant="secondary" onClick={addComponent}><Plus size={15} />구성 직접 추가</Button></div>
         {components.length ? <div className={styles.componentTableScroll}><table className={styles.componentTable}><thead><tr><th>구성품</th><th>수량</th><th>추가 단가 (원)</th><th>금액</th><th><span className={styles.srOnly}>삭제</span></th></tr></thead><tbody>{components.map(component => {
           const key = componentKey(component);
           const selection = groupById.get(component.groupId)?.selection;
-          return <tr key={key}><td><span className={styles.componentGroup}>{component.groupName}</span><Input aria-label={`${component.choiceName || "추가 구성품"} 이름`} required maxLength={120} value={component.choiceName} onChange={event => changeComponent(key, { choiceName: event.target.value })} /></td><td><Input aria-label={`${component.choiceName || "추가 구성품"} 구성 수량`} type="number" min={1} step={1} required readOnly={selection === "single" || selection === "multiple"} value={component.quantity} onChange={event => changeComponent(key, { quantity: event.target.value })} /></td><td><Input aria-label={`${component.choiceName || "추가 구성품"} 추가 단가`} type="number" step={1} required value={component.unitPrice} onChange={event => changeComponent(key, { unitPrice: event.target.value })} /></td><td className={styles.numeric}>{formatMoney((Number(component.quantity) || 0) * (Number(component.unitPrice) || 0))}</td><td><Button variant="ghost" aria-label={`${component.choiceName || "추가 구성품"} 구성 삭제`} onClick={() => setComponents(current => current.filter(value => componentKey(value) !== key))}><Trash2 size={15} /></Button></td></tr>;
+          const amount = componentAmount(component);
+          return <tr key={key}><td><span className={styles.componentGroup}>{component.groupName}</span><Input aria-label={`${component.choiceName || "추가 구성품"} 이름`} required maxLength={120} value={component.choiceName} onChange={event => changeComponent(key, { choiceName: event.target.value })} /></td><td><Input aria-label={`${component.choiceName || "추가 구성품"} 구성 수량`} type="number" min={1} step={1} required readOnly={selection === "single" || selection === "multiple"} value={component.quantity} onChange={event => changeComponent(key, { quantity: event.target.value })} /></td><td><Input aria-label={`${component.choiceName || "추가 구성품"} 추가 단가`} type="number" step={1} required placeholder="금액 입력" value={component.unitPrice} onChange={event => changeComponent(key, { unitPrice: event.target.value })} /></td><td className={styles.numeric}>{amount === null ? "미정" : formatMoney(amount)}</td><td><Button variant="ghost" aria-label={`${component.choiceName || "추가 구성품"} 구성 삭제`} onClick={() => setComponents(current => current.filter(value => componentKey(value) !== key))}><Trash2 size={15} /></Button></td></tr>;
         })}</tbody></table></div> : <p className={styles.empty}>추가 구성품이 없으면 본체 가격으로 계산합니다. 필요한 구성은 직접 추가할 수 있습니다.</p>}
-        <p className={styles.hint}>추가 단가를 바꿔 이번 견적만 조정할 수 있습니다. 누락품 감액은 음수로 입력하세요.</p>
+        <p className={styles.hint}>추가 단가를 바꿔 이번 견적만 조정할 수 있습니다. 추가금 없는 구성은 0원, 누락품 감액은 음수로 입력하세요.</p>
       </section>
-      <div className={styles.calculation} aria-label="용품 계산 내역"><div><span>{pricingMode === "direct" ? "본체 협의 단가" : "본체 기준 단가"}</span><strong>{(pricingMode === "direct" ? optionalNumber(directPrice) : optionalNumber(basePrice)) == null ? "미입력" : formatMoney(Number(pricingMode === "direct" ? directPrice : basePrice))}</strong></div><div><span>구성 금액</span><strong>{formatMoney(componentTotal)}</strong></div><div><span>최종 {modePriceLabel(mode)}</span><strong>{calculated ? formatMoney(calculated.finalUnitPrice) : "—"}</strong></div><div><span>실제 적용율</span><strong>{calculated?.unitPrice != null && calculated.unitPrice > 0 ? formatAppliedRate(calculated.finalUnitPrice / calculated.unitPrice) : "—"}</strong></div></div>
+      <div className={styles.calculation} aria-label="용품 계산 내역"><div><span>{pricingMode === "direct" ? "본체 협의 단가" : "본체 기준 단가"}</span><strong>{(pricingMode === "direct" ? optionalNumber(directPrice) : optionalNumber(basePrice)) == null ? "미입력" : formatMoney(Number(pricingMode === "direct" ? directPrice : basePrice))}</strong></div><div><span>구성 금액</span><strong>{componentTotal === null ? "금액 입력 필요" : formatMoney(componentTotal)}</strong></div><div><span>최종 {modePriceLabel(mode)}</span><strong>{calculated ? formatMoney(calculated.finalUnitPrice) : "—"}</strong></div><div><span>실제 적용율</span><strong>{calculated?.unitPrice != null && calculated.unitPrice > 0 ? formatAppliedRate(calculated.finalUnitPrice / calculated.unitPrice) : "—"}</strong></div></div>
       {pricingMode === "direct" && <p className={styles.hint}>직접 입력한 금액은 천 원 단위로 바꾸지 않습니다. 최종 단가에 제품 수량을 곱해 견적에 담습니다.</p>}
       {error && <div className={styles.error} role="alert">{error}</div>}
       {initial && source !== snapshotSource && <Button className={styles.restore} variant="ghost" onClick={() => changeSource(snapshotSource)}><RotateCcw size={14} />저장 당시 구성으로 되돌리기</Button>}

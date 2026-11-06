@@ -1,6 +1,6 @@
 import type { CalculationMode, EquipmentComponentSnapshot, EquipmentQuoteItem } from "./domain";
 
-export interface EquipmentOptionChoice { id: string; label: string; purchasePrice: number; salePrice: number }
+export interface EquipmentOptionChoice { id: string; label: string; purchasePrice: number | null; salePrice: number | null }
 export interface EquipmentOptionGroup {
   id: string; name: string; selection: "single" | "multiple" | "quantity"; required: boolean; choices: EquipmentOptionChoice[];
 }
@@ -19,7 +19,7 @@ function object(value: unknown): Record<string, unknown> {
 }
 const text = (value: unknown) => typeof value === "string" ? value : "";
 const amount = (value: unknown) => typeof value === "number" || typeof value === "string" && value.trim() !== "" ? Number(value) : Number.NaN;
-const nullableAmount = (value: unknown) => value === null || value === undefined || value === "" ? null : amount(value);
+const nullableAmount = (value: unknown) => value === null || value === undefined || typeof value === "string" && value.trim() === "" ? null : amount(value);
 function name(value: string, label = "이름", limit = 120) {
   if (!value.trim() || value.trim().length > limit) throw new Error(`${label}을 1~${limit}자로 입력해주세요.`);
 }
@@ -48,7 +48,7 @@ export function validateEquipmentOptionGroups(groups: EquipmentOptionGroup[]): v
     for (const choice of group.choices) {
       name(choice.id, "선택지 ID"); name(choice.label, "선택지 이름");
       if (choiceIds.has(choice.id)) throw new Error("그룹 안에 중복된 선택지 ID가 있습니다.");
-      choiceIds.add(choice.id); price(choice.purchasePrice, false, true); price(choice.salePrice, false, true);
+      choiceIds.add(choice.id); price(choice.purchasePrice, true, true); price(choice.salePrice, true, true);
     }
   }
 }
@@ -60,7 +60,7 @@ function normalizeGroups(value: unknown): EquipmentOptionGroup[] {
       id: text(raw.id), name: text(raw.name), selection: text(raw.selection) as EquipmentOptionGroup["selection"], required: raw.required === true,
       choices: (Array.isArray(raw.choices) ? raw.choices : []).map(value => {
         const choice = object(value);
-        return { id: text(choice.id), label: text(choice.label), purchasePrice: amount(choice.purchasePrice), salePrice: amount(choice.salePrice) };
+        return { id: text(choice.id), label: text(choice.label), purchasePrice: nullableAmount(choice.purchasePrice), salePrice: nullableAmount(choice.salePrice) };
       }),
     };
   });
@@ -97,9 +97,9 @@ export function mergeEquipmentOptionGroups(existing: EquipmentOptionGroup[], tem
 }
 
 export function createEquipmentPreset(kind: "tent" | "platform" | "stand"): EquipmentCategory {
-  const choice = (id: string, label: string): EquipmentOptionChoice => ({ id, label, purchasePrice: 0, salePrice: 0 });
+  const choice = (id: string, label: string): EquipmentOptionChoice => ({ id, label, purchasePrice: null, salePrice: null });
   const definitions: Record<typeof kind, Omit<EquipmentCategory, "id">> = {
-    tent: { name: "텐트", unit: "동", optionGroups: [{ id: "fly", name: "플라이", selection: "single", required: false, choices: [choice("long", "롱플라이"), choice("half", "하프플라이"), choice("missing", "미포함")] }] },
+    tent: { name: "텐트", unit: "동", optionGroups: [{ id: "fly", name: "플라이", selection: "multiple", required: false, choices: [choice("long", "롱플라이"), choice("half", "하프플라이")] }] },
     platform: { name: "좌대", unit: "개", optionGroups: [
       { id: "legs", name: "다리 구성", selection: "quantity", required: false, choices: [choice("short", "숏다리"), choice("long", "롱다리")] },
       { id: "accessories", name: "추가 구성", selection: "multiple", required: false, choices: [choice("frame", "전투좌대 프레임"), choice("tent-bracket", "텐트 브라켓"), choice("parasol-clamp", "파라솔 클램프")] },
@@ -132,7 +132,9 @@ export function equipmentOptionSnapshots(groups: EquipmentOptionGroup[], selecti
     if (selection.quantity === 0) continue;
     if (group.selection !== "quantity" && selection.quantity !== 1) throw new Error("수량 선택 그룹만 여러 개를 선택할 수 있습니다.");
     if (group.selection === "single" && result.some(value => value.groupId === group.id)) throw new Error("이 구성 그룹에서는 하나만 선택해주세요.");
-    result.push({ groupId: group.id, groupName: group.name, choiceId: choice.id, choiceName: choice.label, quantity: selection.quantity, unitPrice: equipmentPriceForMode(choice, mode)! });
+    const unitPrice = equipmentPriceForMode(choice, mode);
+    if (unitPrice === null) throw new Error(`${choice.label} ${mode === "purchase" ? "매입" : "판매"} 증감금액을 입력해주세요.`);
+    result.push({ groupId: group.id, groupName: group.name, choiceId: choice.id, choiceName: choice.label, quantity: selection.quantity, unitPrice });
   }
   for (const group of groups) if (group.required && !result.some(value => value.groupId === group.id)) throw new Error(`${group.name} 구성을 선택해주세요.`);
   return result;

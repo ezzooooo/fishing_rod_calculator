@@ -6,6 +6,7 @@ import { chromium } from 'playwright';
 import { quoteBrowserFlow } from './quote-browser-flow';
 import { catalogBrowserFlow } from './catalog-browser-flow';
 import { brandBrowserFlow } from './brand-browser-flow';
+import { equipmentDraftBrowserFlow } from './equipment-draft-browser-flow';
 
 const require=createRequire(import.meta.url);
 const port=Number(process.env.FISHJOONGO_TEST_PORT||3100);
@@ -52,6 +53,13 @@ try{
   await brandBrowserFlow(brandPage);
   await brandContext.close();
   console.log('PASS: confirmed brand registration, review exclusions, alias search and saved quote preservation');
+  const equipmentContext=await browser.newContext({baseURL:origin,viewport:{width:1366,height:768}});
+  const equipmentPage=await equipmentContext.newPage();
+  equipmentPage.on('pageerror',error=>errors.push(error.message));
+  equipmentPage.on('request',request=>{if(/firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com/.test(request.url()))backendRequests.push(request.url());});
+  await equipmentDraftBrowserFlow(equipmentPage);
+  await equipmentContext.close();
+  console.log('PASS: category draft confirmation, repeat import, preserved catalogue prices and explicit unknown component pricing');
   assert.deepEqual(backendRequests,[],'Preview must never request the live Firebase backend');
   assert.deepEqual(errors,[],'Browser runtime errors');
   console.log('PASS: no runtime errors and no live Firebase requests');

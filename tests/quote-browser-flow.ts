@@ -13,6 +13,19 @@ export async function quoteBrowserFlow(page: Page): Promise<void> {
   assert.deepEqual(await customer.evaluate((element: HTMLInputElement) => [element.selectionStart, element.selectionEnd]), [0, "전환 검증 고객".length], "keyboard focus should select the entire customer input");
   await page.getByLabel("메모 (선택)", { exact: true }).fill("여러 종류를 한 번에 저장하는 검증 견적");
 
+  await page.getByRole("button", { name: "낚시대 추가", exact: true }).click();
+  const protectedPicker = page.getByRole("dialog", { name: "낚시대 담기", exact: true });
+  await protectedPicker.getByLabel("낚시대 선택", { exact: true }).selectOption("rod-1");
+  await protectedPicker.getByLabel("32칸 수량", { exact: true }).fill("3");
+  await protectedPicker.getByLabel("32칸 적용율", { exact: true }).selectOption("0.65");
+  await page.mouse.click(2, 2);
+  assert.equal(await protectedPicker.isVisible(), true, "Backdrop clicks must not close an unfinished rod picker");
+  assert.equal(await protectedPicker.getByLabel("32칸 수량", { exact: true }).inputValue(), "3");
+  assert.equal(await protectedPicker.getByLabel("32칸 적용율", { exact: true }).inputValue(), "0.65");
+  await protectedPicker.getByRole("button", { name: "닫기", exact: true }).click();
+  await protectedPicker.waitFor({ state: "hidden" });
+  assert.equal(await page.getByTestId("quote-total").textContent(), "0원", "Explicit close must still cancel the unsent rod");
+
   let keyboardVerified = false;
   async function addRod(id: string, length: number, quantity: number, rate?: string) {
     await page.getByRole("button", { name: "낚시대 추가", exact: true }).click();
@@ -49,6 +62,15 @@ export async function quoteBrowserFlow(page: Page): Promise<void> {
   assert.equal(await total.textContent(), "327,000원");
   assert.match(await page.getByTestId("draft-rod-rod-1").innerText(), /32칸\s*3대/);
   assert.match(await page.getByTestId("draft-rod-rod-2").innerText(), /28칸\s*2대/);
+
+  const firstRodBeforeUndo = await page.getByTestId("draft-rod-rod-1").innerText();
+  await page.getByRole("button", { name: "독야1 빼기", exact: true }).click();
+  assert.equal(await total.textContent(), "132,000원");
+  await page.getByRole("button", { name: "되돌리기", exact: true }).click();
+  assert.equal(await total.textContent(), "327,000원", "Undo must restore saved quantities, rates and unit-price snapshots");
+  assert.equal(await page.getByTestId("draft-rod-rod-1").innerText(), firstRodBeforeUndo);
+  assert.deepEqual(await page.locator('[data-testid^="draft-rod-"]').evaluateAll(elements => elements.map(element => element.getAttribute("data-testid"))), ["draft-rod-rod-1", "draft-rod-rod-2"], "Undo should restore the removed group at its original position");
+  assert.equal(await page.getByRole("button", { name: "되돌리기", exact: true }).count(), 0);
 
   await page.getByRole("button", { name: "판매", exact: true }).click();
   assert.equal(await total.textContent(), "449,000원", "sale must use independent default sale rates and round each unit upward");
@@ -145,6 +167,13 @@ export async function quoteBrowserFlow(page: Page): Promise<void> {
   await page.getByRole("button", { name: "독야1 빼기", exact: true }).click();
   assert.equal(await total.textContent(), "0원");
   assert.equal(await customer.inputValue(), "초기화 검증");
+  await addRod("rod-1", 32, 1, "0.5");
+  assert.equal(await total.textContent(), "50,000원");
+  assert.equal(await page.getByRole("button", { name: "되돌리기", exact: true }).count(), 0, "Adding the same rod again must invalidate the old undo instead of replacing the new quantities");
+  await page.getByRole("button", { name: "독야1 빼기", exact: true }).click();
+  await page.getByRole("button", { name: "되돌리기", exact: true }).click();
+  assert.equal(await total.textContent(), "50,000원", "Only the latest removed group should be restored");
+  await page.getByRole("button", { name: "독야1 빼기", exact: true }).click();
   await addRod("rod-2", 28, 1);
   await page.getByRole("button", { name: "새로 작성", exact: true }).click();
   const reset = page.getByRole("dialog");
@@ -154,6 +183,7 @@ export async function quoteBrowserFlow(page: Page): Promise<void> {
   await page.getByRole("dialog").getByRole("button", { name: "새로 작성", exact: true }).click();
   assert.equal(await total.textContent(), "0원");
   assert.equal(await customer.inputValue(), "");
+  assert.equal(await page.getByRole("button", { name: "되돌리기", exact: true }).count(), 0, "A new draft must never restore a previous customer's removed rod");
 
   await page.setViewportSize({ width: 390, height: 844 });
   await customer.fill("모바일 고객");

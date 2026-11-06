@@ -47,13 +47,36 @@ export function QuoteBuilder() {
   const [equipmentPicker, setEquipmentPicker] = useState<{ item?: EquipmentQuoteItem } | null>(null);
   const [saving, setSaving] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const [removedRod, setRemovedRod] = useState<{ group: QuoteDraftRod; index: number } | null>(null);
+  useEffect(() => {
+    if (!removedRod) return;
+    const timeout = setTimeout(() => setRemovedRod(null), 8000);
+    return () => clearTimeout(timeout);
+  }, [removedRod]);
+  function resetDraft() { setRemovedRod(null); clearDraft(); }
+  function removeRod(group: QuoteDraftRod) {
+    const snapshot = upsertDraftRod({ ...draft, rods: [] }, group).rods[0];
+    setRemovedRod({ group: snapshot, index: draft.rods.findIndex(value => value.rod.id === group.rod.id) });
+    setDraft(current => removeDraftRod(current, group.rod.id));
+  }
+  function undoRemoveRod() {
+    if (!removedRod) return;
+    setDraft(current => {
+      if (current.rods.some(group => group.rod.id === removedRod.group.rod.id)) return current;
+      const restored = upsertDraftRod({ ...current, rods: [] }, removedRod.group).rods[0];
+      const rods = [...current.rods];
+      rods.splice(Math.max(0, Math.min(removedRod.index, rods.length)), 0, restored);
+      return { ...current, rods };
+    });
+    setRemovedRod(null);
+  }
   const items = useMemo(() => quoteItemsFromDraft(draft), [draft]);
   const totals = quoteTotals(items);
   const groupCount = groupQuoteItems(items).length;
   const record: QuoteRecord = { id: "draft", title: titleForDraft(draft), customerName: draft.customerName.trim(), note: draft.note.trim(), mode: draft.mode, items, createdBy: "", createdAt: new Date().toISOString(), updatedAt: null, revision: 0, totalQuantity: totals.totalQuantity, totalPrice: totals.totalPrice };
   const hasContent = !!(draft.rods.length || draft.equipment.length || draft.customerName.trim() || draft.note.trim());
   return <>
-    <PageHeading title="새 견적 만들기" description="낚시대와 용품을 한 고객의 견적에 담고 한 번에 저장하세요." action={<div className={styles.actions}><Link className={styles.linkButton} href="/quotes"><History size={16} />견적 내역</Link><Button variant="secondary" onClick={() => hasContent ? setResetOpen(true) : clearDraft()}><RotateCcw size={16} />새로 작성</Button></div>} />
+    <PageHeading title="새 견적 만들기" description="낚시대와 용품을 한 고객의 견적에 담고 한 번에 저장하세요." action={<div className={styles.actions}><Link className={styles.linkButton} href="/quotes"><History size={16} />견적 내역</Link><Button variant="secondary" onClick={() => hasContent ? setResetOpen(true) : resetDraft()}><RotateCcw size={16} />새로 작성</Button></div>} />
     <div className={styles.builderGrid}>
       <div className={styles.builderMain}>
         <section className={`${styles.card} ${styles.customerStrip}`} aria-labelledby="customer-heading">
@@ -64,6 +87,7 @@ export function QuoteBuilder() {
         </section>
         <section className={styles.basketSection} aria-labelledby="basket-heading">
           <div className={styles.sectionHeading}><h2 id="basket-heading">담은 품목</h2><span className={styles.count}>{groupCount}종</span><div className={`${styles.actions} ${styles.addButton}`}><Button variant="secondary" onClick={() => setEquipmentPicker({})}><Plus size={17} />용품 추가</Button><Button onClick={() => setPicker({})} disabled={catalogLoading || !rods.length}><Plus size={17} />낚시대 추가</Button></div></div>
+          {removedRod && !draft.rods.some(group => group.rod.id === removedRod.group.rod.id) && <div className={styles.undoNotice} role="status"><span>{removedRod.group.rod.name}을 견적에서 뺐습니다.</span><Button variant="secondary" onClick={undoRemoveRod}><RotateCcw size={14} />되돌리기</Button><Button variant="ghost" aria-label="되돌리기 알림 닫기" onClick={() => setRemovedRod(null)}><X size={15} /></Button></div>}
           {catalogError && <div className={styles.error} role="alert"><span>가격표를 불러오지 못했습니다. 작성 중인 견적은 유지됩니다.</span><Button variant="secondary" onClick={retry}>가격표 다시 불러오기</Button></div>}
           {catalogLoading && !items.length ? <div className={styles.card}>가격표를 불러오는 중입니다…</div> : !items.length ? <div className={styles.card}><EmptyState title="아직 담은 품목이 없습니다" description="낚시대는 칸수별로, 텐트·좌대·받침틀은 구성품을 골라 담으세요." action={<div className={styles.actions}>{!!rods.length && <Button onClick={() => setPicker({})}><Plus size={16} />첫 낚시대 담기</Button>}<Button variant="secondary" onClick={() => setEquipmentPicker({})}>용품 직접 추가</Button></div>} /></div> : draft.rods.map(group => {
             const groupItems = quoteItemsFromDraft({ ...draft, rods: [group], equipment: [] }).filter((item): item is RodQuoteItem => !isEquipmentItem(item));
@@ -72,7 +96,7 @@ export function QuoteBuilder() {
               <div className={styles.rodHeading}>
                 <h3><span className={styles.brand}>{group.brandName || "브랜드 미지정"}</span>{group.rod.name}<span className={styles.groupQuantity}>{subtotal.totalQuantity}대</span></h3>
                 <strong className={styles.groupSubtotal}>{formatMoney(subtotal.totalPrice)}</strong>
-                <div className={styles.actions}><Button variant="ghost" aria-label={`${group.rod.name} 수정`} title="낚시대 수정" onClick={() => setPicker({ group })}><Pencil size={16} /></Button><Button variant="ghost" aria-label={`${group.rod.name} 빼기`} title="낚시대 빼기" onClick={() => setDraft(current => removeDraftRod(current, group.rod.id))}><X size={17} /></Button></div>
+                <div className={styles.actions}><Button variant="ghost" aria-label={`${group.rod.name} 수정`} title="낚시대 수정" onClick={() => setPicker({ group })}><Pencil size={16} /></Button><Button variant="ghost" aria-label={`${group.rod.name} 빼기`} title="낚시대 빼기" onClick={() => removeRod(group)}><X size={17} /></Button></div>
               </div>
               <div className={styles.basketTableHead} aria-hidden="true"><div><span>칸수</span><span>수량</span></div><span>최종 단가</span><span>적용율</span><span>금액</span></div>
               <div className={styles.itemList}>{groupItems.map(item => <div className={styles.basketLine} key={item.length}>
@@ -100,10 +124,10 @@ export function QuoteBuilder() {
       </aside>
     </div>
     <div className={styles.saveBar} data-testid="quote-save-bar"><div><span>{draft.customerName.trim() ? `${draft.customerName.trim()} · ` : ""}{groupCount}종 · {quoteQuantityLabel(items)}</span><strong>{formatMoney(totals.totalPrice)}</strong></div><Button onClick={() => setSaving(true)} disabled={!items.length}><FileText size={17} />견적 저장</Button></div>
-    {picker && <RodPicker mode={draft.mode} rods={rods} brands={brands} groups={draft.rods} initial={picker.group} onClose={() => setPicker(null)} onApply={group => { setDraft(current => upsertDraftRod(picker.group && picker.group.rod.id !== group.rod.id ? removeDraftRod(current, picker.group.rod.id) : current, group)); setPicker(null); }} />}
-    {saving && <SaveQuote record={record} onClose={() => setSaving(false)} onSaved={clearDraft} />}
+    {picker && <RodPicker mode={draft.mode} rods={rods} brands={brands} groups={draft.rods} initial={picker.group} onClose={() => setPicker(null)} onApply={group => { setRemovedRod(current => current?.group.rod.id === group.rod.id ? null : current); setDraft(current => upsertDraftRod(picker.group && picker.group.rod.id !== group.rod.id ? removeDraftRod(current, picker.group.rod.id) : current, group)); setPicker(null); }} />}
+    {saving && <SaveQuote record={record} onClose={() => setSaving(false)} onSaved={resetDraft} />}
     {equipmentPicker && <EquipmentPicker mode={draft.mode} initial={equipmentPicker.item} onClose={() => setEquipmentPicker(null)} onApply={item => { setDraft(current => ({ ...current, equipment: equipmentPicker.item ? current.equipment.map(value => value.id === equipmentPicker.item?.id ? item : value) : [...current.equipment, item] })); setEquipmentPicker(null); }} />}
-    {resetOpen && <Modal title="새 견적을 작성할까요?" onClose={() => setResetOpen(false)} footer={<><Button variant="secondary" onClick={() => setResetOpen(false)}>계속 작성</Button><Button onClick={() => { clearDraft(); setResetOpen(false); }}>새로 작성</Button></>}><p>작성 중인 고객 정보와 담은 품목을 비웁니다.</p></Modal>}
+    {resetOpen && <Modal title="새 견적을 작성할까요?" onClose={() => setResetOpen(false)} footer={<><Button variant="secondary" onClick={() => setResetOpen(false)}>계속 작성</Button><Button onClick={() => { resetDraft(); setResetOpen(false); }}>새로 작성</Button></>}><p>작성 중인 고객 정보와 담은 품목을 비웁니다.</p></Modal>}
   </>;
 }
 
@@ -139,7 +163,7 @@ function RodPicker({ mode, rods, brands, groups, initial, onClose, onApply }: Ro
     if (!calculations.length) { setError("수량을 한 대 이상 입력해주세요."); return; }
     onApply({ rod: selected, brandName: brandName(selected), calculations });
   }
-  return <Modal wide title={initial ? "담은 낚시대 수정" : "낚시대 담기"} onClose={onClose} footer={<div className={styles.pickerFooter}><div><span>총 {totalQuantity}대</span><strong>{formatMoney(totalPrice)}</strong></div><Button form="rod-picker" type="submit" disabled={!selected}>{existing.has(selectedId) ? <Check size={17} /> : <Plus size={17} />}{existing.has(selectedId) ? "변경 반영" : "견적에 담기"}</Button></div>}>
+  return <Modal wide title={initial ? "담은 낚시대 수정" : "낚시대 담기"} closeOnBackdrop={false} onClose={onClose} footer={<div className={styles.pickerFooter}><div><span>총 {totalQuantity}대</span><strong>{formatMoney(totalPrice)}</strong></div><Button form="rod-picker" type="submit" disabled={!selected}>{existing.has(selectedId) ? <Check size={17} /> : <Plus size={17} />}{existing.has(selectedId) ? "변경 반영" : "견적에 담기"}</Button></div>}>
     <form id="rod-picker" className={styles.pickerForm} onSubmit={submit}>
       <p className={styles.intro}>{modeLabel(mode)} 견적에 담을 낚시대와 칸수별 수량을 선택하세요.<span className={styles.keyboardHint}>Tab / Enter 다음 수량 · Shift+Tab 이전 수량 · ⌘/Ctrl+Enter 담기</span></p>
       <div className={styles.pickerSelectors}>

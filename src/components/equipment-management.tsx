@@ -8,6 +8,8 @@ import { useEquipmentCatalog } from "@/lib/equipment-context";
 import { createEquipmentPreset, mergeEquipmentOptionGroups, validateEquipmentCategory, validateEquipmentProduct, type EquipmentCategory, type EquipmentOptionGroup, type EquipmentProduct } from "@/lib/equipment";
 import { formatMoney } from "@/lib/format";
 import { brandKey, brandSearchText } from "@/lib/brands";
+import { equipmentCategoryDrafts, equipmentCategoryDraftAliases } from "@/lib/equipment-category-drafts";
+import { planEquipmentCategoryImport } from "@/lib/equipment-category-import";
 import { RodManagement } from "@/components/catalog-workspace";
 import { EquipmentOptionEditor } from "@/components/equipment-option-editor";
 import { Button, EmptyState, Field, Input, Modal, PageHeading } from "@/components/ui";
@@ -185,7 +187,21 @@ export function EquipmentCategoryManagement() {
   const [deleting, setDeleting] = useState<EquipmentCategory | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [importing, setImporting] = useState(false);
+  const importPlan = planEquipmentCategoryImport(categories, equipmentCategoryDrafts, equipmentCategoryDraftAliases);
+  const importable = importPlan.entries.filter(entry => entry.action === "create" || entry.action === "update");
   const available = !!repository && !loading && !catalogError;
+  async function importDrafts() {
+    if (!repository || busy || !available || !importable.length) return;
+    const selectedIds = new Set(importable.map(entry => entry.draftId));
+    setBusy(true); setError("");
+    try {
+      const result = await repository.importEquipmentCategories(equipmentCategoryDrafts.filter(draft => selectedIds.has(draft.id)), equipmentCategoryDraftAliases);
+      setImporting(false);
+      notify(`분류 ${result.created}개 추가, 기존 ${result.updated}개 구성을 보완했습니다.`, "success");
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "분류 초안을 등록하지 못했습니다. 다시 시도해주세요."); }
+    finally { setBusy(false); }
+  }
   async function remove() {
     if (!repository || !deleting || busy) return;
     if (products.some(product => product.categoryId === deleting.id)) { setError("이 분류의 제품을 다른 분류로 옮긴 뒤 삭제해주세요."); return; }
@@ -195,12 +211,19 @@ export function EquipmentCategoryManagement() {
     finally { setBusy(false); }
   }
   return <>
-    <PageHeading title="용품 분류·구성 관리" description="새 분류와 재사용할 기본 구성을 추가합니다. 텐트·좌대·받침틀 외의 장비도 등록할 수 있습니다." action={<Button disabled={!available} onClick={() => setEditor("new")}><Plus size={17} />용품 분류 추가</Button>} />
+    <PageHeading title="용품 분류·구성 관리" description="새 분류와 재사용할 기본 구성을 추가합니다. 텐트·좌대·받침틀 외의 장비도 등록할 수 있습니다." action={<><Button variant="secondary" disabled={!available || busy} onClick={() => { setImporting(true); setError(""); }}><Layers3 size={16} />분류 초안 등록</Button><Button disabled={!available || busy} onClick={() => setEditor("new")}><Plus size={17} />용품 분류 추가</Button></>} />
     <CatalogStatus />
     <section className={styles.panel}><div className={styles.toolbar}><strong>용품 분류 <span>{categories.length}개</span></strong><p className={styles.toolbarHelp}>기본 구성은 제품 등록·수정에서 가져와 제품별 가격으로 조정합니다.</p></div>
       {categories.length ? <div className={styles.tableScroll}><table className={styles.table}><thead><tr><th>분류명</th><th>기본 단위</th><th>등록 제품</th><th>기본 구성</th><th className={styles.actionsHeading}>관리</th></tr></thead><tbody>{categories.map(category => { const count = products.filter(product => product.categoryId === category.id).length; return <tr key={category.id}><td><button className={styles.nameButton} disabled={!available} onClick={() => setEditor(category)}>{category.name}</button></td><td>{category.unit}</td><td>{count}종</td><td>{category.optionGroups.length ? category.optionGroups.map(group => group.name).join(" · ") : "구성 없음"}</td><td><div className={styles.compactActions}><Button variant="ghost" aria-label={`${category.name} 분류 수정`} disabled={!available} onClick={() => setEditor(category)}><Pencil size={15} /></Button><Button variant="ghost" aria-label={`${category.name} 분류 삭제`} title={count ? "등록 제품의 분류를 변경한 뒤 삭제할 수 있습니다." : undefined} disabled={!available || count > 0} onClick={() => { setDeleting(category); setError(""); }}><Trash2 size={15} /></Button></div></td></tr>; })}</tbody></table></div> : !loading && !catalogError && <EmptyState title="등록된 용품 분류가 없습니다" description="분류를 추가하고 텐트·좌대·받침틀 기본 구성을 가져오거나, 새로운 구성을 직접 만들어보세요." action={<Button disabled={!available} onClick={() => setEditor("new")}><Plus size={16} />첫 용품 분류 추가</Button>} />}
     </section>
     {editor && <CategoryEditor category={editor === "new" ? undefined : editor} onClose={() => setEditor(null)} />}
+    {importing && <Modal wide title="분류 초안 등록 확인" onClose={busy ? undefined : () => setImporting(false)} footer={<><Button variant="secondary" disabled={busy} onClick={() => setImporting(false)}>취소</Button><Button disabled={busy || !available || !importable.length} onClick={importDrafts}>{busy ? "등록 중…" : "확인 후 등록"}</Button></>}>
+      <div className={styles.draftSummary}><strong>새 분류 {importPlan.created}개</strong><span>기존 구성 보완 {importPlan.updated}개</span><span>이미 반영 {importPlan.unchanged}개</span>{importPlan.conflicts > 0 && <span className={styles.draftConflict}>중복 확인 필요 {importPlan.conflicts}개 · 제외</span>}</div>
+      <p className={styles.draftHelp}>상품에서 확인한 20개 분류와 자주 쓰는 기본 구성을 등록합니다. 기존 분류의 이름·단위·구성·금액은 유지하고 빠진 항목만 추가합니다. 새 선택지의 금액은 미정으로 둡니다.</p>
+      <div className={`${styles.tableScroll} ${styles.draftScroll}`}><table className={`${styles.table} ${styles.draftTable}`}><thead><tr><th>분류명</th><th>단위</th><th>기본 구성</th><th>처리</th></tr></thead><tbody>{importPlan.entries.map(entry => <tr key={entry.draftId}><td><strong>{entry.category.name}</strong>{entry.category.name !== entry.draftName && <small>초안: {entry.draftName}</small>}</td><td>{entry.category.unit}</td><td>{entry.category.optionGroups.map(group => group.name).join(" · ") || "구성 없음"}<small>{entry.category.optionGroups.length}그룹 · {entry.category.optionGroups.reduce((sum, group) => sum + group.choices.length, 0)}개 선택지</small></td><td><span className={entry.action === "conflict" ? styles.draftConflict : undefined}>{entry.action === "create" ? "새로 등록" : entry.action === "update" ? "기존 구성 보완" : entry.action === "unchanged" ? "이미 반영됨" : "중복 확인 후 등록"}</span>{entry.reason && <small>{entry.reason}</small>}</td></tr>)}</tbody></table></div>
+      <p className={styles.draftHelp}>등록 후 분류 수정에서 이름·구성·금액을 바꿀 수 있습니다. 기존 제품과 저장된 견적은 자동으로 바뀌지 않습니다.</p>
+      {error && <p role="alert" className={styles.error}>{error}</p>}
+    </Modal>}
     {deleting && <DeleteDialog title="용품 분류 삭제" description={`‘${deleting.name}’ 분류와 기본 구성을 삭제할까요? 저장된 견적의 정보는 유지됩니다.`} busy={busy} error={error} onClose={() => setDeleting(null)} onConfirm={remove} />}
   </>;
 }

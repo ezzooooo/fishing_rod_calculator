@@ -8,6 +8,7 @@
 .filters{display:flex;align-items:center;gap:8px}.filters>select{width:140px;min-height:34px;font-size:12px}
 .search{position:relative;width:240px}.search>svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted)}.search input{padding-left:33px;min-height:34px;font-size:12px}
 .tableScroll{min-width:0;overflow-x:auto;scrollbar-width:thin}
+.draftSummary{display:flex;flex-wrap:wrap;gap:6px 16px;color:#57705e;font-size:12px;line-height:1.8}.draftSummary strong{color:#25543c}.draftHelp{margin:12px 0;color:var(--muted);font-size:12px;line-height:1.75}.draftScroll{max-height:44dvh;border:1px solid var(--line);border-radius:8px;overscroll-behavior:contain}.draftTable{min-width:650px;table-layout:fixed}.draftTable th:first-child{width:22%}.draftTable th:nth-child(2){width:9%}.draftTable th:last-child{width:20%}.draftTable thead{position:sticky;top:0;z-index:1}.draftTable td:nth-child(1),.draftTable td:nth-child(2){min-width:0}.draftTable td{height:auto;overflow-wrap:anywhere}.draftConflict{color:#a14c40}
 .table{width:100%;min-width:780px;border-collapse:collapse;font-size:12px;text-align:left}
 .table th{padding:8px 13px;background:#fafcf8;color:var(--muted);font-size:11px;font-weight:550;white-space:nowrap}
 .table td{height:56px;padding:9px 13px;border-top:1px solid #e9eee7;line-height:1.5}.table td>small{display:block;margin-top:3px;color:var(--muted);font-size:11px}

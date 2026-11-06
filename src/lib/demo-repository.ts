@@ -2,6 +2,7 @@ import { normalizeBrand, normalizeFishingRod, normalizeQuoteRecord, quoteTotals,
 import { QuoteConflictError, type AppRepository, type QuoteInput } from './repository';
 import { cloneEquipmentItem, createEquipmentPreset, normalizeEquipmentCategory, normalizeEquipmentProduct, validateEquipmentCategory, validateEquipmentProduct, type EquipmentCategory, type EquipmentProduct } from './equipment';
 import { activeBrands, assertBrandAvailable, assertBrandDeletable, brandDocumentId, mergedBrandIdsFor, planBrandImport, resolveBrandId, validateBrandInput, type BrandInput } from './brands';
+import { planEquipmentCategoryImport, type EquipmentCategoryImportAliases } from './equipment-category-import';
 
 function demoEquipmentCategories(): EquipmentCategory[] {
   return (['tent','platform','stand'] as const).map((kind,index)=>{
@@ -69,6 +70,21 @@ export class DemoRepository implements AppRepository {
   async saveRod(rod:FishingRod){const value=normalizeFishingRod(rod as unknown as Record<string,unknown>);this.rods=[...this.rods.filter(item=>item.id!==rod.id),value];this.emit();}
   async deleteRod(id:string){this.rods=this.rods.filter(rod=>rod.id!==id);this.emit();}
   async saveEquipmentCategory(value:EquipmentCategory){validateEquipmentCategory(value);this.equipmentCategories=[...this.equipmentCategories.filter(item=>item.id!==value.id),normalizeEquipmentCategory(value as unknown as Record<string,unknown>)];this.emit();}
+  async importEquipmentCategories(drafts:readonly EquipmentCategory[],aliases:EquipmentCategoryImportAliases={}){
+    const plan=planEquipmentCategoryImport(this.equipmentCategories,drafts,aliases);
+    if(plan.conflicts)throw new Error(`기존 분류와 안전하게 연결할 수 없는 항목 ${plan.conflicts}개가 있습니다. 미리보기를 다시 확인해주세요.`);
+    const now=new Date().toISOString();
+    const next=[...this.equipmentCategories];
+    for(const entry of plan.entries){
+      if(entry.action==='create')next.push({...entry.category,createdAt:now,updatedAt:now});
+      else if(entry.action==='update'){
+        const index=next.findIndex(value=>value.id===entry.category.id);
+        next[index]={...next[index],optionGroups:entry.category.optionGroups,updatedAt:now};
+      }
+    }
+    this.equipmentCategories=next;this.emit();
+    return {created:plan.created,updated:plan.updated,unchanged:plan.unchanged};
+  }
   async deleteEquipmentCategory(id:string){this.equipmentCategories=this.equipmentCategories.filter(value=>value.id!==id);this.emit();}
   async saveEquipmentProduct(value:EquipmentProduct){validateEquipmentProduct(value);this.equipmentProducts=[...this.equipmentProducts.filter(item=>item.id!==value.id),normalizeEquipmentProduct(value as unknown as Record<string,unknown>)];this.emit();}
   async deleteEquipmentProduct(id:string){this.equipmentProducts=this.equipmentProducts.filter(value=>value.id!==id);this.emit();}
