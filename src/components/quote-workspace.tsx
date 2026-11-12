@@ -14,6 +14,7 @@ import type { Brand } from "@/lib/domain";
 import { copyReceiptImage, createReceiptImage, downloadReceiptImage } from "@/lib/receipt-image";
 import { QuoteConflictError } from "@/lib/repository";
 import { purchaseOutcomeFor, purchaseStatusLabel } from "@/lib/purchase-outcome";
+import { appendQuoteItems } from "@/lib/quote-editing";
 import { PurchaseOutcomePanel, PurchaseStatusBadge } from "@/components/purchase-outcome";
 import { Button, EmptyState, Field, Input, Modal, PageHeading, Textarea } from "@/components/ui";
 import { EquipmentPicker } from "@/components/equipment-picker";
@@ -134,8 +135,8 @@ export function QuoteBuilder() {
 }
 
 type RodLine = { quantity: string; discountRate: number; saleRate: number };
-type RodPickerProps = { mode: CalculationMode; rods: FishingRod[]; brands: Brand[]; groups: QuoteDraftRod[]; initial?: QuoteDraftRod; onClose: () => void; onApply: (group: QuoteDraftRod) => void };
-function RodPicker({ mode, rods, brands, groups, initial, onClose, onApply }: RodPickerProps) {
+type RodPickerProps = { mode: CalculationMode; rods: FishingRod[]; brands: Brand[]; groups: QuoteDraftRod[]; initial?: QuoteDraftRod; appendToQuote?: boolean; onClose: () => void; onApply: (group: QuoteDraftRod) => void };
+function RodPicker({ mode, rods, brands, groups, initial, appendToQuote = false, onClose, onApply }: RodPickerProps) {
   const existing = useMemo(() => new Map([...groups, ...(initial ? [initial] : [])].map(group => [group.rod.id, group])), [groups, initial]);
   const catalogue = useMemo(() => [...new Map([...rods, ...[...existing.values()].map(group => group.rod)].map(rod => [rod.id, rod])).values()].sort((a, b) => a.name.localeCompare(b.name, "ko")), [rods, existing]);
   const brandName = (rod: FishingRod) => existing.get(rod.id)?.brandName ?? brands.find(brand => brand.id === rod.brandId)?.name ?? "알 수 없음";
@@ -163,7 +164,8 @@ function RodPicker({ mode, rods, brands, groups, initial, onClose, onApply }: Ro
     if (lengths.some(length => !Number.isSafeInteger(Number(lines[length].quantity)) || Number(lines[length].quantity) < 0)) { setError("수량은 0 이상의 정수로 입력해주세요."); return; }
     const calculations = lengths.filter(length => Number(lines[length].quantity) > 0).map(length => ({ fishingRodId: selected.id, length, quantity: Number(lines[length].quantity), discountRate: lines[length].discountRate, saleRate: lines[length].saleRate }));
     if (!calculations.length) { setError("수량을 한 대 이상 입력해주세요."); return; }
-    onApply({ rod: selected, brandName: brandName(selected), calculations });
+    try { onApply({ rod: selected, brandName: brandName(selected), calculations }); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : "낚시대를 견적에 담지 못했습니다. 입력 내용을 확인해주세요."); }
   }
   return <Modal wide title={initial ? "담은 낚시대 수정" : "낚시대 담기"} closeOnBackdrop={false} onClose={onClose} footer={<div className={styles.pickerFooter}><div><span>총 {totalQuantity}대</span><strong>{formatMoney(totalPrice)}</strong></div><Button form="rod-picker" type="submit" disabled={!selected}>{existing.has(selectedId) ? <Check size={17} /> : <Plus size={17} />}{existing.has(selectedId) ? "변경 반영" : "견적에 담기"}</Button></div>}>
     <form id="rod-picker" className={styles.pickerForm} onSubmit={submit}>
@@ -174,7 +176,7 @@ function RodPicker({ mode, rods, brands, groups, initial, onClose, onApply }: Ro
       </div>
       {!filtered.length && <p className={styles.muted}>검색 결과가 없습니다. 다른 이름으로 검색해주세요.</p>}
       {selected ? <>
-        <div className={styles.pickerHeading}><div><h3>{selected.name}</h3><p>{existing.has(selectedId) ? "이미 담은 낚시대입니다. 변경 반영을 누르면 기존 수량을 바꿉니다." : "종류를 바꿔도 다른 낚시대의 수량은 복사되지 않습니다."}</p></div><Field label="적용율 일괄"><select className="control" key={selectedId} aria-label="적용율 일괄" defaultValue="" onChange={event => { const rate = Number(event.target.value); if (!Number.isFinite(rate)) return; setLines(current => Object.fromEntries(Object.entries(current).map(([length, line]) => [length, { ...line, [mode === "purchase" ? "discountRate" : "saleRate"]: rate }]))); }}><option value="" disabled>일괄 선택</option>{rateOptions.map(rate => <option key={rate} value={rate}>{rateLabel(rate)}</option>)}</select></Field></div>
+        <div className={styles.pickerHeading}><div><h3>{selected.name}</h3><p>{appendToQuote ? "입력한 수량을 기존 견적에 추가합니다. 기존 항목의 가격은 유지됩니다." : existing.has(selectedId) ? "이미 담은 낚시대입니다. 변경 반영을 누르면 기존 수량을 바꿉니다." : "종류를 바꿔도 다른 낚시대의 수량은 복사되지 않습니다."}</p></div><Field label="적용율 일괄"><select className="control" key={selectedId} aria-label="적용율 일괄" defaultValue="" onChange={event => { const rate = Number(event.target.value); if (!Number.isFinite(rate)) return; setLines(current => Object.fromEntries(Object.entries(current).map(([length, line]) => [length, { ...line, [mode === "purchase" ? "discountRate" : "saleRate"]: rate }]))); }}><option value="" disabled>일괄 선택</option>{rateOptions.map(rate => <option key={rate} value={rate}>{rateLabel(rate)}</option>)}</select></Field></div>
         <div className={styles.pickerRows}>{lengths.map(length => { const line = lines[length]; const rate = mode === "purchase" ? line.discountRate : line.saleRate; const options = [...new Set([...rateOptions, rate])].sort((a, b) => a - b); const subtotal = adjustedUnitPrice(priceForLength(selected, length, mode), rate, mode) * Math.max(0, Number(line.quantity) || 0); return <div className={styles.pickerRow} key={`${selectedId}-${length}`}><div className={styles.pickerLength}><strong>{length}칸</strong><span>기준 {formatMoney(priceForLength(selected, length, mode))}</span></div><Field label="수량"><Input aria-label={`${length}칸 수량`} data-testid={`quantity-${length}`} type="number" min={0} step={1} required value={line.quantity} onKeyDown={event => {
                     if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
                     event.preventDefault();
@@ -372,11 +374,12 @@ export function QuoteDetail() {
 
 function QuoteDetailContent({ id }: { id: string }) {
   const router = useRouter();
-  const { repository, status, notify } = useApp();
+  const { repository, status, notify, rods, brands, catalogLoading, catalogError, retry } = useApp();
   const [attempt, setAttempt] = useState(0);
   const [remote, setRemote] = useState<{ id: string; record: QuoteRecord | null; error: string }>({ id: "", record: null, error: "" });
   const [editing, setEditing] = useState<QuoteRecord | null>(null);
   const [base, setBase] = useState<QuoteRecord | null>(null);
+  const [rodPickerOpen, setRodPickerOpen] = useState(false);
   const [itemEditor, setItemEditor] = useState<{ index: number; item?: RodQuoteItem } | null>(null);
   const [equipmentEditor, setEquipmentEditor] = useState<{ index: number; item?: EquipmentQuoteItem } | null>(null);
   const [discard, setDiscard] = useState<"cancel" | "leave" | null>(null);
@@ -407,6 +410,14 @@ function QuoteDetailContent({ id }: { id: string }) {
   }, [changed]);
   function leave() { if (changed) setDiscard("leave"); else router.push("/quotes"); }
   function cancel() { if (changed) setDiscard("cancel"); else { setEditing(null); setBase(null); setError(""); } }
+  function addRod(group: QuoteDraftRod) {
+    if (!editing) return;
+    const additions = quoteItemsFromDraft({ mode: editing.mode, customerName: editing.customerName, note: editing.note, rods: [group], equipment: [] });
+    const items = appendQuoteItems(editing.items, additions);
+    setEditing(current => current && ({ ...current, items }));
+    setRodPickerOpen(false);
+    setError("");
+  }
   async function save() {
     if (!editing || !repository || busy) return;
     const totals = quoteTotals(editing.items);
@@ -439,7 +450,8 @@ function QuoteDetailContent({ id }: { id: string }) {
         </section>
         <PurchaseOutcomePanel record={record} disabled={!!editing || busy}/>
         <section className={styles.detailItemsSection}>
-          <div className={styles.sectionHeading}><h2>견적 항목</h2><span className={styles.count}>{groups.length}종 · {record.items.length}개 항목</span>{editing && <div className={`${styles.actions} ${styles.addButton}`}><Button variant="secondary" onClick={() => setItemEditor({ index: -1 })} disabled={busy || record.items.length >= 500}><Plus size={16} />낚시대 항목 추가</Button><Button variant="secondary" onClick={() => setEquipmentEditor({ index: -1 })} disabled={busy || record.items.length >= 500}><Plus size={16} />용품 추가</Button></div>}</div>
+          <div className={styles.sectionHeading}><h2>견적 항목</h2><span className={styles.count}>{groups.length}종 · {record.items.length}개 항목</span>{editing && <div className={`${styles.actions} ${styles.addButton}`}><Button variant="secondary" onClick={() => setRodPickerOpen(true)} disabled={busy || catalogLoading || !rods.length || record.items.length >= 500}><Plus size={16} />낚시대 추가</Button><Button variant="secondary" onClick={() => setEquipmentEditor({ index: -1 })} disabled={busy || record.items.length >= 500}><Plus size={16} />용품 추가</Button><Button variant="ghost" onClick={() => setItemEditor({ index: -1 })} disabled={busy || record.items.length >= 500}>낚시대 직접 입력</Button></div>}</div>
+          {editing && catalogError && <div className={styles.error} role="alert"><span>낚시대 가격표를 불러오지 못했습니다. 기존 견적과 직접 입력은 유지됩니다.</span><Button variant="secondary" onClick={retry}>가격표 다시 불러오기</Button></div>}
           {!record.items.length ? <div className={styles.card}><EmptyState title="견적 항목을 추가해주세요" /></div> : <div className={styles.detailTableScroll} role="region" aria-label="견적 항목 표 스크롤" tabIndex={0}>
             <table className={`${styles.detailItemsTable} ${record.items.some(isEquipmentItem) ? styles.mixedItemsTable : ""}`} aria-label="견적 항목">
               <thead><tr><th scope="col">규격 / 구성</th><th scope="col">수량</th><th scope="col">기준 단가</th><th scope="col">적용율</th><th scope="col">{modeLabel(record.mode)} 단가</th><th scope="col">{modeLabel(record.mode)}금액</th>{editing && <th scope="col">관리</th>}</tr></thead>
@@ -464,7 +476,8 @@ function QuoteDetailContent({ id }: { id: string }) {
     </div>
     {editing && <div className={styles.saveBar}><div><span>{quoteQuantityLabel(record.items)}</span><strong>{formatMoney(totals.totalPrice)}</strong></div><Button disabled={busy} onClick={save}>{busy ? "저장 중…" : "수정 내용 저장"}</Button></div>}
     {itemEditor && editing && <QuoteItemEditor item={itemEditor.item} mode={editing.mode} onClose={() => setItemEditor(null)} onApply={item => { setEditing(current => current && ({ ...current, items: itemEditor.index < 0 ? [...current.items, item] : current.items.map((value, index) => index === itemEditor.index ? item : value) })); setItemEditor(null); }} />}
-    {equipmentEditor && editing && <EquipmentPicker mode={editing.mode} initial={equipmentEditor.item} onClose={() => setEquipmentEditor(null)} onApply={item => { setEditing(current => current && ({ ...current, items: equipmentEditor.index < 0 ? [...current.items, item] : current.items.map((value, index) => index === equipmentEditor.index ? item : value) })); setEquipmentEditor(null); }} />}
+    {rodPickerOpen && editing && <RodPicker mode={editing.mode} rods={rods} brands={brands} groups={[]} appendToQuote onClose={() => setRodPickerOpen(false)} onApply={addRod}/>}
+    {equipmentEditor && editing && <EquipmentPicker mode={editing.mode} initial={equipmentEditor.item} onClose={() => setEquipmentEditor(null)} onApply={item => { const items = equipmentEditor.index < 0 ? appendQuoteItems(editing.items, [item]) : editing.items.map((value, index) => index === equipmentEditor.index ? item : value); setEditing(current => current && ({ ...current, items })); setEquipmentEditor(null); setError(""); }} />}
     {discard && <Modal title="변경사항을 버릴까요?" onClose={() => setDiscard(null)} footer={<><Button variant="secondary" onClick={() => setDiscard(null)}>계속 수정</Button><Button onClick={() => { const leavePage = discard === "leave"; setEditing(null); setBase(null); setError(""); setDiscard(null); if (leavePage) router.push("/quotes"); }}>변경사항 버리기</Button></>}><p>저장하지 않은 변경사항을 버립니다.</p></Modal>}
     {deleteOpen && <Modal title="견적 삭제" onClose={busy ? undefined : () => setDeleteOpen(false)} footer={<><Button variant="secondary" disabled={busy} onClick={() => setDeleteOpen(false)}>취소</Button><Button variant="danger" disabled={busy} onClick={remove}>{busy ? "삭제 중…" : "삭제"}</Button></>}><p>「{record.title}」 견적을 삭제하시겠습니까? 삭제한 기록은 복구할 수 없습니다.</p></Modal>}
   </>;
