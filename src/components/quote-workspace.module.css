@@ -109,6 +109,9 @@
 .detailGroupHeading th>div{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 .detailGroupHeading h3{margin:0;color:#2c4937;font-size:12px;font-weight:700;overflow-wrap:anywhere}
 .detailGroupHeading span{flex-shrink:0;color:#687872;font-size:11px;font-weight:500}
+.detailGroupTools{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.detailGroupTools>button{min-height:28px;padding:4px 7px;font-size:11px;white-space:nowrap}
+@media(max-width:767px){.detailGroupHeading th>div{max-width:calc(100vw - 64px);flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:5px 10px}.detailGroupTools>button{min-height:36px}}
 .detailLineAmount{color:#18765f;font-weight:700}
 .detailItemsTable .detailGroupSubtotal td{height:34px;padding:7px 12px;background:#fafcf8;text-align:left}
 .detailGroupSubtotal .priceSummary{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px 22px;padding:0;border:0}

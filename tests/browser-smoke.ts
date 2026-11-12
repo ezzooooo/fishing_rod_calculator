@@ -9,6 +9,7 @@ import { brandBrowserFlow } from './brand-browser-flow';
 import { equipmentDraftBrowserFlow } from './equipment-draft-browser-flow';
 import { purchaseOutcomeBrowserFlow } from './purchase-outcome-browser-flow';
 import { quoteDetailAddBrowserFlow } from './quote-detail-add-browser-flow';
+import { quoteDetailGroupBrowserFlow } from './quote-detail-group-browser-flow';
 
 const require=createRequire(import.meta.url);
 const port=Number(process.env.FISHJOONGO_TEST_PORT||3100);
@@ -76,6 +77,13 @@ try{
   await quoteDetailAddBrowserFlow(detailAddPage);
   await detailAddContext.close();
   console.log('PASS: shared detail item pickers, additive quantities, saved snapshots and edit rollback');
+  const groupEditContext=await browser.newContext({baseURL:origin,viewport:{width:1366,height:768}});
+  const groupEditPage=await groupEditContext.newPage();
+  groupEditPage.on('pageerror',error=>errors.push(error.message));
+  groupEditPage.on('request',request=>{if(/firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com/.test(request.url()))backendRequests.push(request.url());});
+  await quoteDetailGroupBrowserFlow(groupEditPage);
+  await groupEditContext.close();
+  console.log('PASS: saved rod group editing, duplicate lengths, historical prices, keyboard entry and rollback');
   assert.deepEqual(backendRequests,[],'Preview must never request the live Firebase backend');
   assert.deepEqual(errors,[],'Browser runtime errors');
   console.log('PASS: no runtime errors and no live Firebase requests');

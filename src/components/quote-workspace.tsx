@@ -14,7 +14,7 @@ import type { Brand } from "@/lib/domain";
 import { copyReceiptImage, createReceiptImage, downloadReceiptImage } from "@/lib/receipt-image";
 import { QuoteConflictError } from "@/lib/repository";
 import { purchaseOutcomeFor, purchaseStatusLabel } from "@/lib/purchase-outcome";
-import { appendQuoteItems } from "@/lib/quote-editing";
+import { appendQuoteItems, applySavedRodGroupEditor, createSavedRodGroupEditor, savedRodEditUnitPrice, type SavedRodGroupEditor, type SavedRodGroupChange } from "@/lib/quote-editing";
 import { PurchaseOutcomePanel, PurchaseStatusBadge } from "@/components/purchase-outcome";
 import { Button, EmptyState, Field, Input, Modal, PageHeading, Textarea } from "@/components/ui";
 import { EquipmentPicker } from "@/components/equipment-picker";
@@ -134,6 +134,30 @@ export function QuoteBuilder() {
   </>;
 }
 
+type RodQuantityRow = { key: string; length: number; label: string; quantity: string; rate: number; unitPrice: number; finalUnitPrice: number; detail?: string };
+function RodQuantityFields({ name, description, rows, formId, selectionKey, onQuantity, onRate, onBulkRate }: { name: string; description: string; rows: RodQuantityRow[]; formId: string; selectionKey: string; onQuantity: (key: string, quantity: string) => void; onRate: (key: string, rate: number) => void; onBulkRate: (rate: number) => void }) {
+  return <>
+    <div className={styles.pickerHeading}><div><h3>{name}</h3><p>{description}</p></div><Field label="적용율 일괄"><select className="control" key={selectionKey} aria-label="적용율 일괄" defaultValue="" onChange={event => { const rate = Number(event.target.value); if (Number.isFinite(rate)) onBulkRate(rate); }}><option value="" disabled>일괄 선택</option>{rateOptions.map(rate => <option key={rate} value={rate}>{rateLabel(rate)}</option>)}</select></Field></div>
+    <div className={styles.pickerRows}>{rows.map((row, index) => {
+      const options = [...new Set([...rateOptions, row.rate])].sort((a, b) => a - b);
+      return <div className={styles.pickerRow} key={row.key}>
+        <div className={styles.pickerLength}><strong>{row.label}</strong><span>기준 {formatMoney(row.unitPrice)}</span>{row.detail && <span>{row.detail}</span>}</div>
+        <Field label="수량"><Input aria-label={`${row.label} 수량`} data-testid={`quantity-${row.key}`} data-rod-quantity type="number" min={0} step={1} required value={row.quantity} onChange={event => onQuantity(row.key, event.target.value)} onKeyDown={event => {
+          if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+          event.preventDefault();
+          const form = event.currentTarget.form;
+          if (event.ctrlKey || event.metaKey) { form?.requestSubmit(); return; }
+          const next = form?.querySelectorAll<HTMLInputElement>("[data-rod-quantity]")[index + 1];
+          if (next) next.focus();
+          else form?.ownerDocument.querySelector<HTMLButtonElement>(`button[form="${formId}"][type="submit"]`)?.focus();
+        }} /></Field>
+        <Field label="적용율"><select className="control" tabIndex={-1} aria-label={`${row.label} 적용율`} value={row.rate} onChange={event => onRate(row.key, Number(event.target.value))}>{options.map(rate => <option key={rate} value={rate}>{rateLabel(rate)}</option>)}</select></Field>
+        <div className={styles.pickerSubtotal}><span>소계</span><strong>{formatMoney(row.finalUnitPrice * Math.max(0, Number(row.quantity) || 0))}</strong></div>
+      </div>;
+    })}</div>
+  </>;
+}
+
 type RodLine = { quantity: string; discountRate: number; saleRate: number };
 type RodPickerProps = { mode: CalculationMode; rods: FishingRod[]; brands: Brand[]; groups: QuoteDraftRod[]; initial?: QuoteDraftRod; appendToQuote?: boolean; onClose: () => void; onApply: (group: QuoteDraftRod) => void };
 function RodPicker({ mode, rods, brands, groups, initial, appendToQuote = false, onClose, onApply }: RodPickerProps) {
@@ -175,18 +199,48 @@ function RodPicker({ mode, rods, brands, groups, initial, appendToQuote = false,
       <Field label="낚시대 선택"><select className="control" aria-label="낚시대 선택" value={selectedId} onChange={event => { const rod = catalogue.find(item => item.id === event.target.value); setSelectedId(rod?.id ?? ""); setLines(rod ? initialLines(rod) : {}); setError(""); }}><option value="">낚시대를 선택해주세요</option>{selectedOptions.map(rod => <option value={rod.id} key={rod.id}>[{brandName(rod)}] {rod.name}</option>)}</select></Field>
       </div>
       {!filtered.length && <p className={styles.muted}>검색 결과가 없습니다. 다른 이름으로 검색해주세요.</p>}
-      {selected ? <>
-        <div className={styles.pickerHeading}><div><h3>{selected.name}</h3><p>{appendToQuote ? "입력한 수량을 기존 견적에 추가합니다. 기존 항목의 가격은 유지됩니다." : existing.has(selectedId) ? "이미 담은 낚시대입니다. 변경 반영을 누르면 기존 수량을 바꿉니다." : "종류를 바꿔도 다른 낚시대의 수량은 복사되지 않습니다."}</p></div><Field label="적용율 일괄"><select className="control" key={selectedId} aria-label="적용율 일괄" defaultValue="" onChange={event => { const rate = Number(event.target.value); if (!Number.isFinite(rate)) return; setLines(current => Object.fromEntries(Object.entries(current).map(([length, line]) => [length, { ...line, [mode === "purchase" ? "discountRate" : "saleRate"]: rate }]))); }}><option value="" disabled>일괄 선택</option>{rateOptions.map(rate => <option key={rate} value={rate}>{rateLabel(rate)}</option>)}</select></Field></div>
-        <div className={styles.pickerRows}>{lengths.map(length => { const line = lines[length]; const rate = mode === "purchase" ? line.discountRate : line.saleRate; const options = [...new Set([...rateOptions, rate])].sort((a, b) => a - b); const subtotal = adjustedUnitPrice(priceForLength(selected, length, mode), rate, mode) * Math.max(0, Number(line.quantity) || 0); return <div className={styles.pickerRow} key={`${selectedId}-${length}`}><div className={styles.pickerLength}><strong>{length}칸</strong><span>기준 {formatMoney(priceForLength(selected, length, mode))}</span></div><Field label="수량"><Input aria-label={`${length}칸 수량`} data-testid={`quantity-${length}`} type="number" min={0} step={1} required value={line.quantity} onKeyDown={event => {
-                    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
-                    event.preventDefault();
-                    const form = event.currentTarget.form;
-                    if (event.ctrlKey || event.metaKey) { form?.requestSubmit(); return; }
-                    const nextLength = lengths[lengths.indexOf(length) + 1];
-                    if (nextLength !== undefined) form?.querySelector<HTMLInputElement>(`[data-testid="quantity-${nextLength}"]`)?.focus();
-                    else form?.ownerDocument.querySelector<HTMLButtonElement>('button[form="rod-picker"][type="submit"]')?.focus();
-                  }} onChange={event => { setLines(current => ({ ...current, [length]: { ...current[length], quantity: event.target.value } })); setError(""); }} /></Field><Field label="적용율"><select className="control" tabIndex={-1} aria-label={`${length}칸 적용율`} value={rate} onChange={event => setLines(current => ({ ...current, [length]: { ...current[length], [mode === "purchase" ? "discountRate" : "saleRate"]: Number(event.target.value) } }))}>{options.map(value => <option key={value} value={value}>{rateLabel(value)}</option>)}</select></Field><div className={styles.pickerSubtotal}><span>소계</span><strong>{formatMoney(subtotal)}</strong></div></div>; })}</div>
-      </> : <div className={styles.pickerEmpty}><ShoppingBag size={34} /><p>낚시대를 선택하면 칸수별 수량을 입력할 수 있습니다.</p></div>}
+      {selected ? <RodQuantityFields
+        name={selected.name}
+        description={appendToQuote ? "입력한 수량을 기존 견적에 추가합니다. 기존 항목의 가격은 유지됩니다." : existing.has(selectedId) ? "이미 담은 낚시대입니다. 변경 반영을 누르면 기존 수량을 바꿉니다." : "종류를 바꿔도 다른 낚시대의 수량은 복사되지 않습니다."}
+        formId="rod-picker" selectionKey={selectedId}
+        rows={lengths.map(length => { const line = lines[length]; const rate = mode === "purchase" ? line.discountRate : line.saleRate; const unitPrice = priceForLength(selected, length, mode); return { key: String(length), length, label: `${length}칸`, quantity: line.quantity, rate, unitPrice, finalUnitPrice: adjustedUnitPrice(unitPrice, rate, mode) }; })}
+        onQuantity={(key, quantity) => { setLines(current => ({ ...current, [key]: { ...current[key], quantity } })); setError(""); }}
+        onRate={(key, rate) => setLines(current => ({ ...current, [key]: { ...current[key], [mode === "purchase" ? "discountRate" : "saleRate"]: rate } }))}
+        onBulkRate={rate => setLines(current => Object.fromEntries(Object.entries(current).map(([key, line]) => [key, { ...line, [mode === "purchase" ? "discountRate" : "saleRate"]: rate }])))}
+      /> : <div className={styles.pickerEmpty}><ShoppingBag size={34} /><p>낚시대를 선택하면 칸수별 수량을 입력할 수 있습니다.</p></div>}
+      {error && <div className={styles.error} role="alert">{error}</div>}
+    </form>
+  </Modal>;
+}
+
+function SavedRodGroupPicker({ editor, onClose, onApply }: { editor: SavedRodGroupEditor; onClose: () => void; onApply: (changes: SavedRodGroupChange[]) => void }) {
+  const [changes, setChanges] = useState(() => Object.fromEntries(editor.rows.map(row => [row.key, { quantity: String(row.item.quantity), rate: row.item.rate }])));
+  const [error, setError] = useState("");
+  const first = editor.rows.find(row => row.sourceIndex !== null)!.item;
+  const counts = new Map<number, number>();
+  const occurrences = new Map<number, number>();
+  editor.rows.forEach(row => counts.set(row.item.length, (counts.get(row.item.length) ?? 0) + 1));
+  const rows: RodQuantityRow[] = editor.rows.map(row => {
+    const line = changes[row.key];
+    const occurrence = (occurrences.get(row.item.length) ?? 0) + 1;
+    occurrences.set(row.item.length, occurrence);
+    const duplicate = counts.get(row.item.length)! > 1;
+    return { key: row.key, length: row.item.length, label: `${row.item.length}칸${duplicate ? ` 항목 ${occurrence}` : ""}`, quantity: line.quantity, rate: line.rate, unitPrice: row.item.unitPrice, finalUnitPrice: savedRodEditUnitPrice(row, line.rate, editor.mode), detail: row.sourceIndex === null ? "추가 가능 칸수" : duplicate ? `기존 ${rateLabel(row.item.rate)} · 단가 ${formatMoney(row.item.finalUnitPrice)}` : undefined };
+  });
+  const totalQuantity = rows.reduce((total, row) => total + Math.max(0, Number(row.quantity) || 0), 0);
+  const totalPrice = rows.reduce((total, row) => total + row.finalUnitPrice * Math.max(0, Number(row.quantity) || 0), 0);
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    try { onApply(rows.map(row => ({ key: row.key, quantity: Number(row.quantity), rate: row.rate }))); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : "낚시대 수량과 적용율을 확인해주세요."); }
+  }
+  return <Modal wide title="담은 낚시대 수정" closeOnBackdrop={false} onClose={onClose} footer={<div className={styles.pickerFooter}><div><span>총 {totalQuantity}대</span><strong>{formatMoney(totalPrice)}</strong></div><Button type="submit" form="saved-rod-picker"><Check size={17}/>변경 반영</Button></div>}>
+    <form id="saved-rod-picker" className={styles.pickerForm} onSubmit={submit}>
+      <p className={styles.intro}>{first.brandName ? `[${first.brandName}] ` : ""}{first.fishingRodName}의 칸수별 수량과 적용율을 수정하세요.<span className={styles.keyboardHint}>Tab / Enter 다음 수량 · Shift+Tab 이전 수량 · ⌘/Ctrl+Enter 변경 반영</span></p>
+      <RodQuantityFields name={first.fishingRodName} description="수량 0은 해당 항목을 뺍니다. 기존 칸수는 저장된 기준 단가를, 추가 칸수는 현재 가격표를 사용합니다." rows={rows} formId="saved-rod-picker" selectionKey={editor.groupKey}
+        onQuantity={(key, quantity) => { setChanges(current => ({ ...current, [key]: { ...current[key], quantity } })); setError(""); }}
+        onRate={(key, rate) => { setChanges(current => ({ ...current, [key]: { ...current[key], rate } })); setError(""); }}
+        onBulkRate={rate => { setChanges(current => Object.fromEntries(Object.entries(current).map(([key, line]) => [key, { ...line, rate }]))); setError(""); }}/>
       {error && <div className={styles.error} role="alert">{error}</div>}
     </form>
   </Modal>;
@@ -380,6 +434,7 @@ function QuoteDetailContent({ id }: { id: string }) {
   const [editing, setEditing] = useState<QuoteRecord | null>(null);
   const [base, setBase] = useState<QuoteRecord | null>(null);
   const [rodPickerOpen, setRodPickerOpen] = useState(false);
+  const [rodGroupEditor, setRodGroupEditor] = useState<SavedRodGroupEditor | null>(null);
   const [itemEditor, setItemEditor] = useState<{ index: number; item?: RodQuoteItem } | null>(null);
   const [equipmentEditor, setEquipmentEditor] = useState<{ index: number; item?: EquipmentQuoteItem } | null>(null);
   const [discard, setDiscard] = useState<"cancel" | "leave" | null>(null);
@@ -417,6 +472,11 @@ function QuoteDetailContent({ id }: { id: string }) {
     setEditing(current => current && ({ ...current, items }));
     setRodPickerOpen(false);
     setError("");
+  }
+  function editRodGroup(groupKey: string, rodId: string) {
+    if (!editing) return;
+    try { setRodGroupEditor(createSavedRodGroupEditor(editing.items, groupKey, editing.mode, rods.find(rod => rod.id === rodId))); setError(""); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : "낚시대 항목을 불러오지 못했습니다."); }
   }
   async function save() {
     if (!editing || !repository || busy) return;
@@ -456,7 +516,7 @@ function QuoteDetailContent({ id }: { id: string }) {
             <table className={`${styles.detailItemsTable} ${record.items.some(isEquipmentItem) ? styles.mixedItemsTable : ""}`} aria-label="견적 항목">
               <thead><tr><th scope="col">규격 / 구성</th><th scope="col">수량</th><th scope="col">기준 단가</th><th scope="col">적용율</th><th scope="col">{modeLabel(record.mode)} 단가</th><th scope="col">{modeLabel(record.mode)}금액</th>{editing && <th scope="col">관리</th>}</tr></thead>
               {groups.map(group => <tbody key={group.key} aria-label={`${rodLabel(group.items[0])} 항목`}>
-                <tr className={styles.detailGroupHeading}><th scope="rowgroup" colSpan={editing ? 7 : 6}><div><h3>{isEquipmentItem(group.items[0]) ? `[${group.items[0].categoryName}] ` : ""}{rodLabel(group.items[0])}</h3><span>{quoteQuantityLabel(group.items)}</span></div></th></tr>
+                <tr className={styles.detailGroupHeading}><th scope="rowgroup" colSpan={editing ? 7 : 6}><div><h3>{isEquipmentItem(group.items[0]) ? `[${group.items[0].categoryName}] ` : ""}{rodLabel(group.items[0])}</h3><div className={styles.detailGroupTools}><span>{quoteQuantityLabel(group.items)}</span>{editing && group.kind === "rod" && <Button variant="ghost" aria-label={`${group.fishingRodName} 칸수별 수정`} disabled={busy} onClick={() => editRodGroup(group.key, group.fishingRodId)}><Pencil size={14}/>칸수별 수정</Button>}</div></div></th></tr>
                 {group.items.map(item => {
                   const index = record.items.indexOf(item);
                   return <tr key={index}>
@@ -477,6 +537,7 @@ function QuoteDetailContent({ id }: { id: string }) {
     {editing && <div className={styles.saveBar}><div><span>{quoteQuantityLabel(record.items)}</span><strong>{formatMoney(totals.totalPrice)}</strong></div><Button disabled={busy} onClick={save}>{busy ? "저장 중…" : "수정 내용 저장"}</Button></div>}
     {itemEditor && editing && <QuoteItemEditor item={itemEditor.item} mode={editing.mode} onClose={() => setItemEditor(null)} onApply={item => { setEditing(current => current && ({ ...current, items: itemEditor.index < 0 ? [...current.items, item] : current.items.map((value, index) => index === itemEditor.index ? item : value) })); setItemEditor(null); }} />}
     {rodPickerOpen && editing && <RodPicker mode={editing.mode} rods={rods} brands={brands} groups={[]} appendToQuote onClose={() => setRodPickerOpen(false)} onApply={addRod}/>}
+    {rodGroupEditor && editing && <SavedRodGroupPicker editor={rodGroupEditor} onClose={() => setRodGroupEditor(null)} onApply={changes => { const items = applySavedRodGroupEditor(editing.items, rodGroupEditor, changes, editing.mode); setEditing(current => current && ({ ...current, items })); setRodGroupEditor(null); setError(""); }}/>}
     {equipmentEditor && editing && <EquipmentPicker mode={editing.mode} initial={equipmentEditor.item} onClose={() => setEquipmentEditor(null)} onApply={item => { const items = equipmentEditor.index < 0 ? appendQuoteItems(editing.items, [item]) : editing.items.map((value, index) => index === equipmentEditor.index ? item : value); setEditing(current => current && ({ ...current, items })); setEquipmentEditor(null); setError(""); }} />}
     {discard && <Modal title="변경사항을 버릴까요?" onClose={() => setDiscard(null)} footer={<><Button variant="secondary" onClick={() => setDiscard(null)}>계속 수정</Button><Button onClick={() => { const leavePage = discard === "leave"; setEditing(null); setBase(null); setError(""); setDiscard(null); if (leavePage) router.push("/quotes"); }}>변경사항 버리기</Button></>}><p>저장하지 않은 변경사항을 버립니다.</p></Modal>}
     {deleteOpen && <Modal title="견적 삭제" onClose={busy ? undefined : () => setDeleteOpen(false)} footer={<><Button variant="secondary" disabled={busy} onClick={() => setDeleteOpen(false)}>취소</Button><Button variant="danger" disabled={busy} onClick={remove}>{busy ? "삭제 중…" : "삭제"}</Button></>}><p>「{record.title}」 견적을 삭제하시겠습니까? 삭제한 기록은 복구할 수 없습니다.</p></Modal>}
